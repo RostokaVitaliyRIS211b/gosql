@@ -4,15 +4,58 @@ import (
 	"testing"
 )
 
-type User struct {
-	Id          int    `db:"Id"`
-	Name        string `db:"Name"`
-	Password    string `db:"Password"`
-	Description string `db:"Description"`
-	Roles       []int32
+type dbItem struct {
+	Id                 int     `db:"Id"`
+	ObjectId           int     `db:"Objectid"`
+	TypeUnitId         int     `db:"TypeUnitId"`
+	CountOfUnits       float64 `db:"CountOfUnits"`
+	PricePerUnit       float64 `db:"PricePerUnit"`
+	ExcpectedCost      float64 `db:"ExcpectedCost"`
+	ProducerId         int     `db:"ProducerId"`
+	Description        string  `db:"Description"`
+	TypeOfItem         int     `db:"TypeOfItemId"`
+	NameId             int     `db:"NameId"`
+	CountOfUsedUnits   float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnits1  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnits2  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnits3  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnits4  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnits5  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnits6  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnits7  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnits8  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnits9  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnits10 float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnits11 float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsq  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsw  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitse  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsd  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsf  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsg  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsh  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsj  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsk  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsl  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsz  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsx  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsc  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsv  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsb  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsn  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnitsm  float64 `db:"CountOfUsedUnits"`
+	CountOfUsedUnits09 float64 `db:"CountOfUsedUnits"`
 }
 
-type User2 struct {
+type user struct {
+	Id          int     `db:"Id"`
+	Name        string  `db:"Name"`
+	Password    string  `db:"Password"`
+	Description string  `db:"Description"`
+	Roles       []int32 `ffff:"gg"`
+}
+
+type user2 struct {
 	Id          int    `dbcn:"Id"`
 	Name        string `dbcn:"Name"`
 	Password    string `dbcn:"Password"`
@@ -41,8 +84,12 @@ const (
 )
 
 var config = QueryConfig{
-	TableName:   tableName,
-	NameWrapper: wrapper,
+	TableName:    tableName,
+	NameWrapper:  wrapper,
+	ColumnName:   columnName,
+	ItemToAdd:    dbItem{},
+	TagName:      "db",
+	ExcludedTags: []string{"Id"},
 }
 
 func TestInsertQuery(t *testing.T) {
@@ -51,7 +98,7 @@ func TestInsertQuery(t *testing.T) {
 		NameWrapper:  "",
 		ColumnName:   "",
 		TagName:      "",
-		ItemToAdd:    User2{},
+		ItemToAdd:    user2{},
 		ExcludedTags: []string{"Id"},
 	}
 	res := GetInsertQuery(query)
@@ -60,7 +107,7 @@ func TestInsertQuery(t *testing.T) {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+insertQuery1+"\n"+res)
 	}
 
-	res = GetInsertQuery(query.ChangeTagName(tagName).ChangeItem(User{}))
+	res = GetInsertQuery(query.ChangeTagName(tagName).ChangeItem(user{}))
 
 	if res != insertQuery1 {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+insertQuery1+"\n"+res)
@@ -85,7 +132,7 @@ func TestUpdateQuery(t *testing.T) {
 		NameWrapper:  "",
 		ColumnName:   "",
 		TagName:      "",
-		ItemToAdd:    User2{},
+		ItemToAdd:    user2{},
 		ExcludedTags: []string{"Id"},
 	}
 	res := GetSelectQuery(query)
@@ -94,7 +141,7 @@ func TestUpdateQuery(t *testing.T) {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+selectQuery1+"\n"+res)
 	}
 
-	res = GetSelectQuery(query.ChangeTagName(tagName).ChangeItem(User{}))
+	res = GetSelectQuery(query.ChangeTagName(tagName).ChangeItem(user{}))
 
 	if res != selectQuery1 {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+selectQuery1+"\n"+res)
@@ -119,7 +166,7 @@ func TestSelectQuery(t *testing.T) {
 		NameWrapper:  "",
 		ColumnName:   "",
 		TagName:      "",
-		ItemToAdd:    User2{},
+		ItemToAdd:    user2{},
 		ExcludedTags: []string{"Id"},
 	}
 	res := GetUpdateQuery(query)
@@ -128,7 +175,7 @@ func TestSelectQuery(t *testing.T) {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+updateQuery1+"\n"+res)
 	}
 
-	res = GetUpdateQuery(query.ChangeTagName(tagName).ChangeItem(User{}))
+	res = GetUpdateQuery(query.ChangeTagName(tagName).ChangeItem(user{}))
 
 	if res != updateQuery1 {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+updateQuery1+"\n"+res)
@@ -153,7 +200,7 @@ func TestDeleteQuery(t *testing.T) {
 		NameWrapper:  "",
 		ColumnName:   "",
 		TagName:      "",
-		ItemToAdd:    User2{},
+		ItemToAdd:    user2{},
 		ExcludedTags: []string{"Id"},
 	}
 	res := GetDeleteQuery(query)
@@ -162,7 +209,7 @@ func TestDeleteQuery(t *testing.T) {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+deleteQuery1+"\n"+res)
 	}
 
-	res = GetDeleteQuery(query.ChangeTagName(tagName).ChangeItem(User{}))
+	res = GetDeleteQuery(query.ChangeTagName(tagName).ChangeItem(user{}))
 
 	if res != deleteQuery1 {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+deleteQuery1+"\n"+res)
@@ -182,6 +229,52 @@ func TestDeleteQuery(t *testing.T) {
 
 }
 
-func BenchMarkInsertCurrent(b *testing.B) {
+// var sink string
 
-}
+// func BenchmarkInsertNew(b *testing.B) {
+// 	var s string
+// 	for b.Loop() {
+// 		s = GetInsertQuery(config)
+// 	}
+// 	sink = s
+// }
+
+// func BenchmarkInsertOld(b *testing.B) {
+// 	var s string
+// 	for b.Loop() {
+// 		s = GetInsertQueryWithoutGrow(config)
+// 	}
+// 	sink = s
+// }
+
+// func BenchmarkUpdateNew(b *testing.B) {
+// 	var s string
+// 	for b.Loop() {
+// 		s = GetUpdateQuery(config)
+// 	}
+// 	sink = s
+// }
+
+// func BenchmarkUpdateOld(b *testing.B) {
+// 	var s string
+// 	for b.Loop() {
+// 		s = GetUpdateQueryWithoutGrow(config)
+// 	}
+// 	sink = s
+// }
+
+// func BenchmarkSelectNew(b *testing.B) {
+// 	var s string
+// 	for b.Loop() {
+// 		s = GetSelectQuery(config)
+// 	}
+// 	sink = s
+// }
+
+// func BenchmarkSelectOld(b *testing.B) {
+// 	var s string
+// 	for b.Loop() {
+// 		s = GetSelectQueryWithoutGrow(config)
+// 	}
+// 	sink = s
+// }

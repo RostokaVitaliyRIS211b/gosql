@@ -3,25 +3,44 @@ package gosql
 import (
 	"reflect"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
-const stdTagName = "dbcn"
+const StdTagName = "dbcn"
 
 //region Queries
 
-//region InsertQuery
+type QueryType int
+
+const (
+	INSERT = iota
+	UPDATE
+	SELECT
+	DELETE
+)
 
 // TableName - Имя таблицы
-// NameWrapper - нужен для оборачивания имен столбцов и таблиц если это нужно, если указать например " то имя будет "SomeName"
+// NameWrapper - нужен для оборачивания имен столбцов и таблиц, если указать например " то имя будет "SomeName" ;
 // ColumnName - (Insert) нужен для того чтобы можно было вернуть Id добавленной записи, если указан то в конец строки добавится:  RETURNING IdColumnName ;
 // (Update) нужен для того чтобы обновить только определенные записи, в конец строки будет добавлено WHERE ColumnName = $1 ;
 // (Select) нужен для того чтобы отфильтровать получаемые данные, в конец строки будет добавлено WHERE ColumnName = $1  ;
 // (Delete) нужен для того чтобы удалить только определенные записи, в конец строки будет добавлено WHERE ColumnName = $1  ;
-// TagName - нужен для того если вы используете нестандартный тег для полей структуры, тогда вместо стандартного dbcn будет использоваться указанный тег
-// ItemToAdd - структура содержащая поля с тегами, значение которых соответсвует названиям столбцов таблицы
-// ExcludedTags - список тегов которые вы хотите исключить при созданнии строки, например что типа Id, тогда конечная строка не будет содержать данного столбца
+// TagName - нужен для того если вы используете нестандартный тег для полей структуры, тогда вместо стандартного dbcn будет использоваться указанный тег ;
+// ItemToAdd - структура содержащая поля с тегами, значение которых соответсвует названиям столбцов таблицы ;
+// ExcludedTags - список тегов которые вы хотите исключить при созданнии строки, например Id, тогда конечная строка не будет содержать данного столбца ;
+// =========================================================================================================================================================
+// TableName is the name of the table
+// NameWrapper is needed to wrap the names of columns and tables, if you specify, for example, "then the name will be "SomeName"
+// columnName - (Insert) is needed so that you can return the Id of the added record, if specified, then the following will be added to the end of the row: RETURNING IdColumnName ;
+// (Update) is needed in order to update only certain records, WHERE columnName = $1 will be added to the end of the line ;
+// (Select) is needed in order to filter the received data, WHERE columnName = $1 will be added to the end of the line  ;
+// (Delete) is needed in order to delete only certain entries, WHERE columnName = $1 will be added to the end of the line;
+// TagName is needed so that if you use a non-standard tag for the fields of the structure, then the specified tag will be used instead of the standard dbcn ;
+// ItemToAdd - a structure containing fields with tags, the value of which is corresponds to the column names of the table ;
+// ExcludedTags - a list of tags that you want to exclude when creating a row, for example, Id, then the final row will not contain this column. ;
 type QueryConfig struct {
 	TableName    string
 	NameWrapper  string
@@ -31,24 +50,49 @@ type QueryConfig struct {
 	ExcludedTags []string
 }
 
-// Порядок аргументов должен соотвествовать порядку полей в передаваемой структуре
+// Возвращает строку указанного типа /
+// Returns a string of the specified type
+func GetQuery(params QueryConfig, queryType QueryType) string {
+	switch queryType {
+	case INSERT:
+		return GetInsertQuery(params)
+	case UPDATE:
+		return GetUpdateQuery(params)
+	case SELECT:
+		return GetSelectQuery(params)
+	case DELETE:
+		return GetDeleteQuery(params)
+	}
+	return "this query type is not supported"
+}
+
+//region InsertQuery
+
+// Возвращает строку запроса INSERT INTO TableName (ItemFieldTag1, ItemFieldTag2 ...) VALUES ($1,$2 ...) [RETURNING ColumnName] ,если указан ColumnName то в конец строки добавится: RETURNING IdColumnName, Порядок аргументов должен соотвествовать порядку полей в передаваемой структуре
+// ============================================================================================================================================================
+// Returns the INSERT INTO TableName (ItemFieldTag1, ItemFieldTag2 ...) VALUES ($1,$2 ...) [RETURNING ColumnName] query string ... If columnName is specified, then the following is added to the end of the line: RETURNING IdColumnName, the order of the arguments must match the order of the fields in the passed structure.
 func GetInsertQuery(params QueryConfig) string {
 	var builder strings.Builder
 
-	tagName := stdTagName
+	tagName := StdTagName
 
 	if len(params.TagName) > 0 {
 		tagName = params.TagName
 	}
 
-	//Выделяем память под символы сразу
+	typeOfN := TransformToNonRefType(params.ItemToAdd)
+
+	numFields := typeOfN.NumField()
+
 	additionalSymbols := 37
-	totalSymbols := len(params.TableName) + additionalSymbols + len(params.ColumnName)
+	totalSymbols := len(params.TableName) + len(params.ColumnName) + additionalSymbols + numFields*(4+2*len(params.NameWrapper))
+	//Выделяем память под символы сразу
 	builder.Grow(totalSymbols)
 
 	builder.WriteString("INSERT")
 	builder.WriteString(" INTO ")
 
+	//Если указан NameWrapper то оборачиваем в него имя таблицы
 	tbname := params.TableName
 	if len(params.NameWrapper) > 0 {
 		tbname = WrapNigger(params.TableName, params.NameWrapper)
@@ -59,16 +103,12 @@ func GetInsertQuery(params QueryConfig) string {
 
 	counter := 0
 
-	typeOfN := TransformToNonRefType(params.ItemToAdd)
-
 	isFieldDb := false
 	isPrevFieldDb := isFieldDb
 
-	numFields := typeOfN.NumField()
-
-	builder.Grow(numFields * (4 + 2*len(params.NameWrapper)))
-
-	for i := 0; i < typeOfN.NumField(); i++ {
+	//Проходим по всем полям переданной структуры
+	for i := range numFields {
+		//Читаем значение тега
 		tag := typeOfN.Field(i).Tag.Get(tagName)
 
 		isPrevFieldDb = isFieldDb
@@ -78,6 +118,7 @@ func GetInsertQuery(params QueryConfig) string {
 			builder.WriteString(", ")
 		}
 
+		//Если данное поле структуры имеет тег и тег не входит в список исключений, тогда добавляем содержимое тега в нашу строку НЕГРЫ! 14.01.2026
 		if isFieldDb {
 			name := tag
 			if len(params.NameWrapper) > 0 {
@@ -89,6 +130,7 @@ func GetInsertQuery(params QueryConfig) string {
 
 	}
 
+	// формируем такую штуку VALUES ($1,$2 ....)
 	builder.WriteString(") VALUES (")
 	for idx := range counter {
 		if idx > 0 {
@@ -114,14 +156,22 @@ func GetInsertQuery(params QueryConfig) string {
 
 //region UpdateQuery
 
-// Если вы передаете ColumnName, тогда аргумент для него должен быть первым в списке аргументов, для остального порядок аргументов должен соотвествовать порядку полей в передаваемой структуре
+// Возвращает строку типа UPDATE TableName SET ItemFieldTag1=$1, ItemFieldTag2=$2 ... [WHERE ColumnName = $1] , eсли вы передаете ColumnName, тогда в конец строки будет добавлено WHERE ColumnName = $1 и аргумент для него должен быть первым в списке аргументов, для остального порядок аргументов должен соотвествовать порядку полей в передаваемой структуре
+// ===============================================================================================================================
+// Returns a string like UPDATE TableName SET ColumnName1=$1  ItemFieldTag2=$2 ... [WHERE ColumnName = $1] , if you pass ColumnName, then WHERE ColumnName = $1 will be added to the end of the string and the argument for it must be the first in the argument list. For the rest, the order of the arguments must match the order of the fields in the passed structure
 func GetUpdateQuery(params QueryConfig) string {
+	typeOfN := TransformToNonRefType(params.ItemToAdd)
+
+	counter := 0
+
+	numFields := typeOfN.NumField()
+
 	var builder strings.Builder
 	additionalSymbols := 11
-	totalSymbols := len(params.TableName) + len(params.ColumnName) + additionalSymbols
+	totalSymbols := len(params.TableName) + len(params.ColumnName) + additionalSymbols + numFields*(4+2*len(params.NameWrapper))
 	builder.Grow(totalSymbols)
 
-	tagName := stdTagName
+	tagName := StdTagName
 
 	if len(params.TagName) > 0 {
 		tagName = params.TagName
@@ -136,14 +186,6 @@ func GetUpdateQuery(params QueryConfig) string {
 	builder.WriteString(tbname)
 
 	builder.WriteString(" SET ")
-
-	typeOfN := TransformToNonRefType(params.ItemToAdd)
-
-	counter := 0
-
-	numFields := typeOfN.NumField()
-
-	builder.Grow(numFields * (4 + len(params.NameWrapper)))
 
 	adder := 1
 
@@ -192,26 +234,26 @@ func GetUpdateQuery(params QueryConfig) string {
 
 //region Select query
 
-// Если вы передаете ColumnName, тогда аргумент для него должен быть первым в списке аргументов
+// Возвращает строку типа SELECT ItemFieldTag1, ItemFieldTag2 ... FROM TableName [WHERE ColumnName = $1], если вы передаете ColumnName, в конец строки будет добавлено WHERE ColumnName = $1, аргумент для него должен быть первым в списке аргументов
+// ==============================================================================================================================
+// Returns a string of type SELECT ItemFieldTag1, ItemFieldTag2 ... FROM TableName, if you pass columnName, WHERE columnName = $1 will be added to the end of the line, the argument for it must be the first in the argument list.
 func GetSelectQuery(params QueryConfig) string {
 	var builder strings.Builder
+	typeOfN := TransformToNonRefType(params.ItemToAdd)
+	numOfFields := typeOfN.NumField()
+
 	additionalSymbols := 11
-	totalSymbols := len(params.TableName) + len(params.ColumnName) + additionalSymbols
+	totalSymbols := len(params.TableName) + len(params.ColumnName) + additionalSymbols + numOfFields*(4+2*len(params.NameWrapper))
+
 	builder.Grow(totalSymbols)
 
-	tagName := stdTagName
+	tagName := StdTagName
 
 	if len(params.TagName) > 0 {
 		tagName = params.TagName
 	}
 
 	builder.WriteString("SELECT ")
-
-	typeOfN := TransformToNonRefType(params.ItemToAdd)
-
-	numOfFields := typeOfN.NumField()
-
-	builder.Grow(numOfFields * (4 + 2*len(params.NameWrapper)))
 
 	isFieldDb := false
 	isPrevFieldDb := isFieldDb
@@ -261,6 +303,7 @@ func GetSelectQuery(params QueryConfig) string {
 
 // region Delete query
 
+// Возращает строку типа DELETE FROM TableName [WHERE ColumnName = $1], при указании ColumnName в конец строки добавляет WHERE ColumnName = $1
 func GetDeleteQuery(params QueryConfig) string {
 	tableName := params.TableName
 	columnName := params.ColumnName
@@ -304,7 +347,7 @@ func WrapNigger(n string, wrapper string) string {
 
 //endregion
 
-//region Query Config Change Methods
+//region Query Config Change Funcs
 
 func (q QueryConfig) ChangeTable(tableName string, item any) QueryConfig {
 	query := QueryConfig{
@@ -385,13 +428,132 @@ func requiredProcessing(new *QueryConfig, old *QueryConfig) *QueryConfig {
 
 //endregion
 
-type QueriesCacher struct {
-	cacheInsert map[reflect.Type]*string
-	cacheUpdate map[reflect.Type]*string
-	cacheSelect map[reflect.Type]*string
+//region Caching
+
+var (
+	insertQueryCache map[cacheKey]string
+	selectQueryCache map[cacheKey]string
+	updateQueryCache map[cacheKey]string
+	cacheMutex       sync.RWMutex
+)
+
+type cacheKey struct {
+	Type         reflect.Type
+	TableName    string
+	TagName      string
+	ColumnName   string
+	NameWrapper  string
+	ExcludedTags string // отсортированная строка тегов
 }
 
-func (qch *QueriesCacher) GetInsertQuery(q QueryConfig) string {
+func GetCachedQuery(params QueryConfig, queryType QueryType) string {
 
-	return ""
+	switch queryType {
+	case INSERT:
+		return GetInsertQueryCached(params)
+	case UPDATE:
+		return GetUpdateQueryCached(params)
+	case SELECT:
+		return GetSelectQueryCached(params)
+	case DELETE:
+		return GetDeleteQuery(params)
+	}
+
+	return "this query type is not supported"
 }
+
+func GetInsertQueryCached(params QueryConfig) string {
+	itemType := TransformToNonRefType(params.ItemToAdd)
+
+	key := cacheKey{
+		Type:         itemType,
+		TableName:    params.TableName,
+		TagName:      params.TagName,
+		ColumnName:   params.ColumnName,
+		NameWrapper:  params.NameWrapper,
+		ExcludedTags: getExcludedTagsKey(params.ExcludedTags),
+	}
+
+	cacheMutex.RLock()
+	defer cacheMutex.RUnlock()
+
+	if query, ok := insertQueryCache[key]; ok {
+		return query
+	}
+
+	query := GetInsertQuery(params)
+
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	insertQueryCache[key] = query
+
+	return query
+}
+
+func GetUpdateQueryCached(params QueryConfig) string {
+	itemType := TransformToNonRefType(params.ItemToAdd)
+
+	key := cacheKey{
+		Type:         itemType,
+		TableName:    params.TableName,
+		TagName:      params.TagName,
+		ColumnName:   params.ColumnName,
+		NameWrapper:  params.NameWrapper,
+		ExcludedTags: getExcludedTagsKey(params.ExcludedTags),
+	}
+
+	cacheMutex.RLock()
+	defer cacheMutex.RUnlock()
+
+	if query, ok := updateQueryCache[key]; ok {
+		return query
+	}
+
+	query := GetUpdateQuery(params)
+
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	updateQueryCache[key] = query
+
+	return query
+}
+
+func GetSelectQueryCached(params QueryConfig) string {
+	itemType := TransformToNonRefType(params.ItemToAdd)
+
+	key := cacheKey{
+		Type:         itemType,
+		TableName:    params.TableName,
+		TagName:      params.TagName,
+		ColumnName:   params.ColumnName,
+		NameWrapper:  params.NameWrapper,
+		ExcludedTags: getExcludedTagsKey(params.ExcludedTags),
+	}
+
+	cacheMutex.RLock()
+	defer cacheMutex.RUnlock()
+
+	if query, ok := selectQueryCache[key]; ok {
+		return query
+	}
+
+	query := GetSelectQuery(params)
+
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	selectQueryCache[key] = query
+
+	return query
+}
+
+func getExcludedTagsKey(excluded []string) string {
+	if len(excluded) == 0 {
+		return ""
+	}
+	tags := make([]string, len(excluded))
+	copy(tags, excluded)
+	sort.Strings(tags)
+	return strings.Join(tags, ",")
+}
+
+//endregion
