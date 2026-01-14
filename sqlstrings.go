@@ -9,6 +9,8 @@ import (
 
 const stdTagName = "dbcn"
 
+//region Queries
+
 //region InsertQuery
 
 // TableName - Имя таблицы
@@ -16,6 +18,7 @@ const stdTagName = "dbcn"
 // ColumnName - (Insert) нужен для того чтобы можно было вернуть Id добавленной записи, если указан то в конец строки добавится:  RETURNING IdColumnName ;
 // (Update) нужен для того чтобы обновить только определенные записи, в конец строки будет добавлено WHERE ColumnName = $1 ;
 // (Select) нужен для того чтобы отфильтровать получаемые данные, в конец строки будет добавлено WHERE ColumnName = $1  ;
+// (Delete) нужен для того чтобы удалить только определенные записи, в конец строки будет добавлено WHERE ColumnName = $1  ;
 // TagName - нужен для того если вы используете нестандартный тег для полей структуры, тогда вместо стандартного dbcn будет использоваться указанный тег
 // ItemToAdd - структура содержащая поля с тегами, значение которых соответсвует названиям столбцов таблицы
 // ExcludedTags - список тегов которые вы хотите исключить при созданнии строки, например что типа Id, тогда конечная строка не будет содержать данного столбца
@@ -29,7 +32,7 @@ type QueryConfig struct {
 }
 
 // Порядок аргументов должен соотвествовать порядку полей в передаваемой структуре
-func GetInsertQueryReflect(params QueryConfig) string {
+func GetInsertQuery(params QueryConfig) string {
 	var builder strings.Builder
 
 	tagName := stdTagName
@@ -38,8 +41,9 @@ func GetInsertQueryReflect(params QueryConfig) string {
 		tagName = params.TagName
 	}
 
+	//Выделяем память под символы сразу
 	additionalSymbols := 37
-	totalSymbols := len(params.TableName) + additionalSymbols
+	totalSymbols := len(params.TableName) + additionalSymbols + len(params.ColumnName)
 	builder.Grow(totalSymbols)
 
 	builder.WriteString("INSERT")
@@ -59,6 +63,11 @@ func GetInsertQueryReflect(params QueryConfig) string {
 
 	isFieldDb := false
 	isPrevFieldDb := isFieldDb
+
+	numFields := typeOfN.NumField()
+
+	builder.Grow(numFields * (4 + 2*len(params.NameWrapper)))
+
 	for i := 0; i < typeOfN.NumField(); i++ {
 		tag := typeOfN.Field(i).Tag.Get(tagName)
 
@@ -66,7 +75,7 @@ func GetInsertQueryReflect(params QueryConfig) string {
 		isFieldDb = len(tag) > 0 && !slices.Contains(params.ExcludedTags, tag)
 
 		if isFieldDb && isPrevFieldDb {
-			builder.WriteString(",")
+			builder.WriteString(", ")
 		}
 
 		if isFieldDb {
@@ -106,7 +115,7 @@ func GetInsertQueryReflect(params QueryConfig) string {
 //region UpdateQuery
 
 // Если вы передаете ColumnName, тогда аргумент для него должен быть первым в списке аргументов, для остального порядок аргументов должен соотвествовать порядку полей в передаваемой структуре
-func GetUpdateQueryReflect(params QueryConfig) string {
+func GetUpdateQuery(params QueryConfig) string {
 	var builder strings.Builder
 	additionalSymbols := 11
 	totalSymbols := len(params.TableName) + len(params.ColumnName) + additionalSymbols
@@ -131,11 +140,10 @@ func GetUpdateQueryReflect(params QueryConfig) string {
 	typeOfN := TransformToNonRefType(params.ItemToAdd)
 
 	counter := 0
-	var innerBuilder strings.Builder
 
-	numOfFields := typeOfN.NumField()
+	numFields := typeOfN.NumField()
 
-	innerBuilder.Grow(numOfFields * 2)
+	builder.Grow(numFields * (4 + len(params.NameWrapper)))
 
 	adder := 1
 
@@ -143,25 +151,29 @@ func GetUpdateQueryReflect(params QueryConfig) string {
 		adder = 2
 	}
 
-	for i := range numOfFields {
+	isFieldDb := false
+	isPrevFieldDb := isFieldDb
+
+	for i := range numFields {
 		tag := typeOfN.Field(i).Tag.Get(tagName)
 
-		isFieldDb := len(tag) > 0 && !slices.Contains(params.ExcludedTags, tag)
+		isPrevFieldDb = isFieldDb
+		isFieldDb = len(tag) > 0 && !slices.Contains(params.ExcludedTags, tag)
+
+		if isFieldDb && isPrevFieldDb {
+			builder.WriteString(", ")
+		}
 
 		if isFieldDb {
 			if len(params.NameWrapper) > 0 {
 				tag = WrapNigger(tag, params.NameWrapper)
 			}
-			innerBuilder.WriteString(tag)
-			innerBuilder.WriteString(" =  $")
-			innerBuilder.WriteString(strconv.Itoa(counter + adder))
-			innerBuilder.WriteString(", ")
+			builder.WriteString(tag)
+			builder.WriteString(" = $")
+			builder.WriteString(strconv.Itoa(counter + adder))
 			counter++
 		}
-
 	}
-
-	builder.WriteString(strings.TrimSuffix(innerBuilder.String(), ", "))
 
 	if len(params.ColumnName) > 0 {
 		builder.WriteString(" WHERE ")
@@ -197,28 +209,31 @@ func GetSelectQuery(params QueryConfig) string {
 
 	typeOfN := TransformToNonRefType(params.ItemToAdd)
 
-	var innerBuilder strings.Builder
-
 	numOfFields := typeOfN.NumField()
 
-	innerBuilder.Grow(numOfFields * 2)
+	builder.Grow(numOfFields * (4 + 2*len(params.NameWrapper)))
+
+	isFieldDb := false
+	isPrevFieldDb := isFieldDb
 
 	for i := range numOfFields {
 		tag := typeOfN.Field(i).Tag.Get(tagName)
 
-		isFieldDb := len(tag) > 0 && !slices.Contains(params.ExcludedTags, tag)
+		isPrevFieldDb = isFieldDb
+		isFieldDb = len(tag) > 0 && !slices.Contains(params.ExcludedTags, tag)
+
+		if isFieldDb && isPrevFieldDb {
+			builder.WriteString(", ")
+		}
 
 		if isFieldDb {
 			if len(params.NameWrapper) > 0 {
 				tag = WrapNigger(tag, params.NameWrapper)
 			}
-			innerBuilder.WriteString(tag)
-			innerBuilder.WriteString(", ")
+			builder.WriteString(tag)
 		}
 
 	}
-
-	builder.WriteString(strings.TrimSuffix(innerBuilder.String(), ", "))
 
 	builder.WriteString(" FROM ")
 
@@ -244,14 +259,27 @@ func GetSelectQuery(params QueryConfig) string {
 
 //endregion
 
-//region Delete query
+// region Delete query
 
-func DeleteQuery(tableName string, filterColumnName string) string {
-	if len(filterColumnName) == 0 {
-		return "DELETE FROM " + tableName
+func GetDeleteQuery(params QueryConfig) string {
+	tableName := params.TableName
+	columnName := params.ColumnName
+
+	if len(params.NameWrapper) > 0 {
+		tableName = WrapNigger(tableName, params.NameWrapper)
 	}
-	return "DELETE FROM " + tableName + " WHERE " + filterColumnName + " = $1"
+
+	if len(columnName) > 0 {
+		if len(params.NameWrapper) > 0 {
+			columnName = WrapNigger(columnName, params.NameWrapper)
+		}
+		return "DELETE FROM " + tableName + " WHERE " + columnName + " = $1"
+	}
+
+	return "DELETE FROM " + tableName
 }
+
+//endregion
 
 //endregion
 
@@ -275,3 +303,95 @@ func WrapNigger(n string, wrapper string) string {
 }
 
 //endregion
+
+//region Query Config Change Methods
+
+func (q QueryConfig) ChangeTable(tableName string, item any) QueryConfig {
+	query := QueryConfig{
+		TableName:   tableName,
+		NameWrapper: q.NameWrapper,
+		ColumnName:  q.ColumnName,
+		TagName:     q.TagName,
+		ItemToAdd:   item,
+	}
+	return *requiredProcessing(&query, &q)
+}
+
+func (q QueryConfig) ChangeColumnName(columnName string) QueryConfig {
+	query := QueryConfig{
+		TableName:   q.TableName,
+		NameWrapper: q.NameWrapper,
+		ColumnName:  columnName,
+		TagName:     q.TagName,
+		ItemToAdd:   q.ItemToAdd,
+	}
+	return *requiredProcessing(&query, &q)
+}
+
+func (q QueryConfig) ChangeExcludedTags(excludedTags ...string) QueryConfig {
+	query := QueryConfig{
+		TableName:   q.TableName,
+		NameWrapper: q.NameWrapper,
+		ColumnName:  q.ColumnName,
+		TagName:     q.TagName,
+		ItemToAdd:   q.ItemToAdd,
+	}
+	q.ExcludedTags = excludedTags
+	return *requiredProcessing(&query, &q)
+}
+
+func (q QueryConfig) ChangeItem(item any) QueryConfig {
+	query := QueryConfig{
+		TableName:   q.TableName,
+		NameWrapper: q.NameWrapper,
+		ColumnName:  q.ColumnName,
+		TagName:     q.TagName,
+		ItemToAdd:   item,
+	}
+	return *requiredProcessing(&query, &q)
+}
+
+func (q QueryConfig) ChangeTagName(tagName string) QueryConfig {
+	query := QueryConfig{
+		TableName:   q.TableName,
+		NameWrapper: q.NameWrapper,
+		ColumnName:  q.ColumnName,
+		TagName:     tagName,
+		ItemToAdd:   q.ItemToAdd,
+	}
+	return *requiredProcessing(&query, &q)
+}
+
+func (q QueryConfig) ChangeNameWrapper(wrapper string) QueryConfig {
+	query := QueryConfig{
+		TableName:   q.TableName,
+		NameWrapper: wrapper,
+		ColumnName:  q.ColumnName,
+		TagName:     q.TagName,
+		ItemToAdd:   q.ItemToAdd,
+	}
+	return *requiredProcessing(&query, &q)
+}
+
+func requiredProcessing(new *QueryConfig, old *QueryConfig) *QueryConfig {
+	var newExcTags []string
+	if len(old.ExcludedTags) > 0 {
+		newExcTags = make([]string, len(old.ExcludedTags))
+		copy(newExcTags, old.ExcludedTags)
+	}
+	new.ExcludedTags = newExcTags
+	return new
+}
+
+//endregion
+
+type QueriesCacher struct {
+	cacheInsert map[reflect.Type]*string
+	cacheUpdate map[reflect.Type]*string
+	cacheSelect map[reflect.Type]*string
+}
+
+func (qch *QueriesCacher) GetInsertQuery(q QueryConfig) string {
+
+	return ""
+}
