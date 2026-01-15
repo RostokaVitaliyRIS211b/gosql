@@ -329,15 +329,13 @@ func GetDeleteQuery(params QueryConfig) string {
 //region Share funcs
 
 func TransformToNonRefType(value any) reflect.Type {
-
 	typeOfVal := reflect.TypeOf(value)
-	val := reflect.ValueOf(value)
+	kind := typeOfVal.Kind()
 
-	for kind := typeOfVal.Kind(); kind == reflect.Pointer || kind == reflect.Interface; {
-		val = val.Elem()
-		typeOfVal = val.Type()
+	for kind == reflect.Pointer {
+		typeOfVal = typeOfVal.Elem()
+		kind = typeOfVal.Kind()
 	}
-
 	return typeOfVal
 }
 
@@ -475,13 +473,13 @@ func GetInsertQueryCached(params QueryConfig) string {
 	}
 
 	cacheMutex.RLock()
-	defer cacheMutex.RUnlock()
-
-	if query, ok := insertQueryCache[key]; ok {
+	query, ok := insertQueryCache[key]
+	cacheMutex.RUnlock()
+	if ok {
 		return query
 	}
 
-	query := GetInsertQuery(params)
+	query = GetInsertQuery(params)
 
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
@@ -503,13 +501,13 @@ func GetUpdateQueryCached(params QueryConfig) string {
 	}
 
 	cacheMutex.RLock()
-	defer cacheMutex.RUnlock()
-
-	if query, ok := updateQueryCache[key]; ok {
+	query, ok := updateQueryCache[key]
+	cacheMutex.RUnlock()
+	if ok {
 		return query
 	}
 
-	query := GetUpdateQuery(params)
+	query = GetUpdateQuery(params)
 
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
@@ -531,13 +529,13 @@ func GetSelectQueryCached(params QueryConfig) string {
 	}
 
 	cacheMutex.RLock()
-	defer cacheMutex.RUnlock()
-
-	if query, ok := selectQueryCache[key]; ok {
+	query, ok := selectQueryCache[key]
+	cacheMutex.RUnlock()
+	if ok {
 		return query
 	}
 
-	query := GetSelectQuery(params)
+	query = GetSelectQuery(params)
 
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()

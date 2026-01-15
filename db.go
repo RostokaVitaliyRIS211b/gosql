@@ -4,40 +4,49 @@ import (
 	"context"
 	"database/sql"
 	"reflect"
+	"sync/atomic"
 )
 
+type Scanner interface {
+	Scan(item any, tagName string, rows *sql.Rows, excludedTags []string) error
+}
+
 type DbHandler interface {
-	Select(dest []any, query string, args ...any) error
-	Insert(query string, args ...any) (id int, err error)
-	Exec(query string, args ...any) (int, error)
-	SelectContext(context context.Context, dest []any, query string, args ...any) error
-	InsertContext(context context.Context, query string, args ...any) (id int, err error)
-	ExecContext(context context.Context, query string, args ...any) (int, error)
+	Select(dest []any, queryConfig QueryConfig, args ...any) error
+	Insert(queryConfig QueryConfig, args ...any) (id int, err error)
+	Exec(queryConfig QueryConfig, args ...any) (int, error)
+	SelectContext(context context.Context, dest []any, queryConfig QueryConfig, args ...any) error
+	InsertContext(context context.Context, queryConfig QueryConfig, args ...any) (id int, err error)
+	ExecContext(context context.Context, queryConfig QueryConfig, args ...any) (int, error)
+	UseCachedFuncs(bool)
 }
 
 type DB struct {
-	Id             string
-	TagName        string
-	Handler        *DbHandler
-	UseCachedFuncs bool
+	Id      string
+	TagName string
+	handler DbHandler
 }
 
 type StdDbHandler struct {
-	Db *sql.DB
+	db             *sql.DB
+	scanner        Scanner
+	useCachedFuncs *atomic.Bool
 }
 
-func (hn *StdDbHandler) Select(context context.Context, dest []any, query string, args ...any) error {
-	destType := TransformToNonRefType(reflect.TypeOf(dest).Elem())
+func (hn *StdDbHandler) SelectContext(context context.Context, dest []any, queryConfig QueryConfig, args ...any) error {
+	ogType := reflect.TypeOf(dest).Elem()
 
-	rows, err := hn.Db.QueryContext(context, query, args...)
+	query := ""
+
+	rows, err := hn.db.QueryContext(context, query, args...)
 
 	if err != nil {
 		return err
 	}
 
 	for rows.Next() {
-		destValue := reflect.Zero(destType)
-		err = rows.Scan()
+		destValue := reflect.Zero(ogType).Interface()
+		err = hn.scanner.Scan(destValue, queryConfig.TagName, rows, queryConfig.ExcludedTags)
 		dest = append(dest, destValue)
 	}
 
