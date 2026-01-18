@@ -1,4 +1,4 @@
-package gosql
+package sqlstrings
 
 import (
 	"testing"
@@ -47,7 +47,7 @@ type dbItem struct {
 	CountOfUsedUnits09 float64 `db:"CountOfUsedUnits"`
 }
 
-type user struct {
+type users struct {
 	Id          int     `db:"Id"`
 	Name        string  `db:"Name"`
 	Password    string  `db:"Password"`
@@ -66,7 +66,7 @@ type user2 struct {
 const (
 	idColumnName = "Id"
 	wrapper      = "\""
-	tableName    = "TABLE1"
+	tableName    = "users"
 	columnName   = "Id"
 	tagName      = "db"
 	insertQuery1 = "INSERT INTO " + tableName + " (Name, Password, Description) VALUES ($1,$2,$3)"
@@ -107,7 +107,7 @@ func TestInsertQuery(t *testing.T) {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+insertQuery1+"\n"+res)
 	}
 
-	res = GetInsertQuery(query.ChangeTagName(tagName).ChangeItem(user{}))
+	res = GetInsertQuery(query.ChangeTagName(tagName).ChangeItem(users{}))
 
 	if res != insertQuery1 {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+insertQuery1+"\n"+res)
@@ -124,9 +124,15 @@ func TestInsertQuery(t *testing.T) {
 	if res != insertQuery3 {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+insertQuery3+"\n"+res)
 	}
+
+	res = GetInsertQuery(query.ChangeTable("", users{}).ChangeTagName(tagName))
+
+	if res != insertQuery1 {
+		t.Errorf("%s", "QUERIES NOT MATCH\n"+insertQuery3+"\n"+res)
+	}
 }
 
-func TestUpdateQuery(t *testing.T) {
+func TestSelectQuery(t *testing.T) {
 	query := QueryConfig{
 		TableName:    tableName,
 		NameWrapper:  "",
@@ -141,7 +147,7 @@ func TestUpdateQuery(t *testing.T) {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+selectQuery1+"\n"+res)
 	}
 
-	res = GetSelectQuery(query.ChangeTagName(tagName).ChangeItem(user{}))
+	res = GetSelectQuery(query.ChangeTagName(tagName).ChangeItem(users{}))
 
 	if res != selectQuery1 {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+selectQuery1+"\n"+res)
@@ -158,9 +164,15 @@ func TestUpdateQuery(t *testing.T) {
 	if res != selectQuery3 {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+selectQuery3+"\n"+res)
 	}
+
+	res = GetSelectQuery(query.ChangeTable("", users{}).ChangeTagName(tagName))
+
+	if res != selectQuery1 {
+		t.Errorf("%s", "QUERIES NOT MATCH\n"+selectQuery1+"\n"+res)
+	}
 }
 
-func TestSelectQuery(t *testing.T) {
+func TestUpdateQuery(t *testing.T) {
 	query := QueryConfig{
 		TableName:    tableName,
 		NameWrapper:  "",
@@ -175,7 +187,7 @@ func TestSelectQuery(t *testing.T) {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+updateQuery1+"\n"+res)
 	}
 
-	res = GetUpdateQuery(query.ChangeTagName(tagName).ChangeItem(user{}))
+	res = GetUpdateQuery(query.ChangeTagName(tagName).ChangeItem(users{}))
 
 	if res != updateQuery1 {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+updateQuery1+"\n"+res)
@@ -191,6 +203,12 @@ func TestSelectQuery(t *testing.T) {
 
 	if res != updateQuery3 {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+updateQuery3+"\n"+res)
+	}
+
+	res = GetUpdateQuery(query.ChangeTable("", users{}).ChangeTagName(tagName))
+
+	if res != updateQuery1 {
+		t.Errorf("%s", "QUERIES NOT MATCH\n"+updateQuery1+"\n"+res)
 	}
 }
 
@@ -209,7 +227,7 @@ func TestDeleteQuery(t *testing.T) {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+deleteQuery1+"\n"+res)
 	}
 
-	res = GetDeleteQuery(query.ChangeTagName(tagName).ChangeItem(user{}))
+	res = GetDeleteQuery(query.ChangeTagName(tagName).ChangeItem(users{}))
 
 	if res != deleteQuery1 {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+deleteQuery1+"\n"+res)
@@ -225,6 +243,12 @@ func TestDeleteQuery(t *testing.T) {
 
 	if res != deleteQuery3 {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+deleteQuery3+"\n"+res)
+	}
+
+	res = GetDeleteQuery(query.ChangeTable("", users{}).ChangeTagName(tagName))
+
+	if res != deleteQuery1 {
+		t.Errorf("%s", "QUERIES NOT MATCH\n"+deleteQuery1+"\n"+res)
 	}
 
 }

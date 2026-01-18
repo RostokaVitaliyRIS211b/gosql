@@ -1,9 +1,11 @@
-package gosql
+package sqlreflect
 
 import (
 	"reflect"
 	"slices"
 	"testing"
+
+	"github.com/RostokaVitaliyRIS211b/gosql/sqlstrings"
 )
 
 var it = reflect.TypeFor[int]()
@@ -302,7 +304,7 @@ func TestScan(t *testing.T) {
 
 	const tagName, tagName2 = "db", "dbcn"
 
-	queryConfig := QueryConfig{
+	queryConfig := sqlstrings.QueryConfig{
 		TableName:    "users",
 		NameWrapper:  "",
 		ColumnName:   "",
@@ -369,7 +371,7 @@ func TestScan(t *testing.T) {
 		t.Errorf("user Name3 not match")
 	}
 
-	if len(*users2[0].Name4) != 0 {
+	if users2[0].Name4 != nil {
 		t.Errorf("user Name4 not match")
 	}
 

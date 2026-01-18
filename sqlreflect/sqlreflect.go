@@ -1,4 +1,4 @@
-package gosql
+package sqlreflect
 
 import (
 	"database/sql"
@@ -6,7 +6,13 @@ import (
 	"reflect"
 	"slices"
 	"sync"
+
+	"github.com/RostokaVitaliyRIS211b/gosql/sqlstrings"
 )
+
+type Scanner interface {
+	Scan(dest any, rows RowScanner, queryConfig sqlstrings.QueryConfig) error
+}
 
 type RowScanner interface {
 	Scan(dest ...any) error
@@ -144,7 +150,7 @@ func (mapper *Mapper) Map(item reflect.Type, tagName string) (*TypeMap, error) {
 	return typeMap, err
 }
 
-func (sc *StdScanner) Scan(dest any, rows RowScanner, queryConfig QueryConfig) error {
+func (sc *StdScanner) Scan(dest any, rows RowScanner, queryConfig sqlstrings.QueryConfig) error {
 
 	ogSliceType := reflect.TypeOf(dest)
 	if ogSliceType.Kind() != reflect.Pointer {
@@ -157,15 +163,7 @@ func (sc *StdScanner) Scan(dest any, rows RowScanner, queryConfig QueryConfig) e
 		return errors.New("dest must be a slice")
 	}
 
-	nonRefSlice := reflect.New(nonRefSliceType).Elem()
-
 	sliceVal := reflect.ValueOf(dest).Elem()
-
-	if sliceVal.CanSet() {
-		sliceVal.Set(nonRefSlice)
-	} else {
-		return errors.New("dest cannot be set")
-	}
 
 	sliceVal.SetLen(0)
 
@@ -273,6 +271,17 @@ func ConversionToOgType(item any, og reflect.Type) (any, error) {
 	return res, nil
 }
 
+func ConversionValToNonRefType(value any) reflect.Type {
+	typeOfVal := reflect.TypeOf(value)
+	kind := typeOfVal.Kind()
+
+	for kind == reflect.Pointer {
+		typeOfVal = typeOfVal.Elem()
+		kind = typeOfVal.Kind()
+	}
+	return typeOfVal
+}
+
 func GetMapper(tagName string) *Mapper {
 	return &Mapper{
 		TagName:   tagName,
@@ -285,4 +294,14 @@ func GetScanner(tagName string) Scanner {
 	return &StdScanner{
 		Mapper: GetMapper(tagName),
 	}
+}
+
+func ConversionTypeToNonRefType(t reflect.Type) reflect.Type {
+	kind := t.Kind()
+
+	for kind == reflect.Pointer {
+		t = t.Elem()
+		kind = t.Kind()
+	}
+	return t
 }

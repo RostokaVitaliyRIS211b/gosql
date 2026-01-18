@@ -1,4 +1,4 @@
-package gosql
+package sqlstrings
 
 import (
 	"reflect"
@@ -22,8 +22,8 @@ const (
 	DELETE
 )
 
-// TableName - Имя таблицы
-// NameWrapper - нужен для оборачивания имен столбцов и таблиц, если указать например " то имя будет "SomeName" ;
+// TableName - Имя таблицы, если оно не указано тогда в качестве имени таблицы будет использовано имя типа структуры поля ItemToAdd
+// NameWrapper - нужен для оборачивания имен столбцов и таблиц, если указать например  "  то имя будет "SomeName" ;
 // ColumnName - (Insert) нужен для того чтобы можно было вернуть Id добавленной записи, если указан то в конец строки добавится:  RETURNING IdColumnName ;
 // (Update) нужен для того чтобы обновить только определенные записи, в конец строки будет добавлено WHERE ColumnName = $1 ;
 // (Select) нужен для того чтобы отфильтровать получаемые данные, в конец строки будет добавлено WHERE ColumnName = $1  ;
@@ -32,12 +32,12 @@ const (
 // ItemToAdd - структура содержащая поля с тегами, значение которых соответсвует названиям столбцов таблицы ;
 // ExcludedTags - список тегов которые вы хотите исключить при созданнии строки, например Id, тогда конечная строка не будет содержать данного столбца ;
 // =========================================================================================================================================================
-// TableName is the name of the table
-// NameWrapper is needed to wrap the names of columns and tables, if you specify, for example, "then the name will be "SomeName"
-// columnName - (Insert) is needed so that you can return the Id of the added record, if specified, then the following will be added to the end of the row: RETURNING IdColumnName ;
-// (Update) is needed in order to update only certain records, WHERE columnName = $1 will be added to the end of the line ;
-// (Select) is needed in order to filter the received data, WHERE columnName = $1 will be added to the end of the line  ;
-// (Delete) is needed in order to delete only certain entries, WHERE columnName = $1 will be added to the end of the line;
+// TableName is the name of the table, if it is not specified, then the name of the ItemToAdd field structure type will be used as the table name
+// NameWrapper is needed to wrap the names of columns and tables, if you specify, for example with  "  then the name will be "SomeName"
+// ColumnName - (Insert) is needed so that you can return the Id of the added record, if specified, then the following will be added to the end of the row: RETURNING IdColumnName ;
+// (Update) is needed in order to update only certain records, WHERE ColumnName = $1 will be added to the end of the line ;
+// (Select) is needed in order to filter the received data, WHERE ColumnName = $1 will be added to the end of the line  ;
+// (Delete) is needed in order to delete only certain entries, WHERE ColumnName = $1 will be added to the end of the line;
 // TagName is needed so that if you use a non-standard tag for the fields of the structure, then the specified tag will be used instead of the standard dbcn ;
 // ItemToAdd - a structure containing fields with tags, the value of which is corresponds to the column names of the table ;
 // ExcludedTags - a list of tags that you want to exclude when creating a row, for example, Id, then the final row will not contain this column. ;
@@ -94,8 +94,13 @@ func GetInsertQuery(params QueryConfig) string {
 
 	//Если указан NameWrapper то оборачиваем в него имя таблицы
 	tbname := params.TableName
+
+	if len(tbname) == 0 {
+		tbname = typeOfN.Name()
+	}
+
 	if len(params.NameWrapper) > 0 {
-		tbname = WrapNigger(params.TableName, params.NameWrapper)
+		tbname = WrapNigger(tbname, params.NameWrapper)
 	}
 	builder.WriteString(tbname)
 
@@ -180,8 +185,13 @@ func GetUpdateQuery(params QueryConfig) string {
 	builder.WriteString("UPDATE ")
 
 	tbname := params.TableName
+
+	if len(tbname) == 0 {
+		tbname = typeOfN.Name()
+	}
+
 	if len(params.NameWrapper) > 0 {
-		tbname = WrapNigger(params.TableName, params.NameWrapper)
+		tbname = WrapNigger(tbname, params.NameWrapper)
 	}
 	builder.WriteString(tbname)
 
@@ -280,6 +290,11 @@ func GetSelectQuery(params QueryConfig) string {
 	builder.WriteString(" FROM ")
 
 	tbname := params.TableName
+
+	if len(tbname) == 0 {
+		tbname = typeOfN.Name()
+	}
+
 	if len(params.NameWrapper) > 0 {
 		tbname = WrapNigger(params.TableName, params.NameWrapper)
 	}
@@ -305,21 +320,26 @@ func GetSelectQuery(params QueryConfig) string {
 
 // Возращает строку типа DELETE FROM TableName [WHERE ColumnName = $1], при указании ColumnName в конец строки добавляет WHERE ColumnName = $1
 func GetDeleteQuery(params QueryConfig) string {
-	tableName := params.TableName
+	tbName := params.TableName
+
+	if len(tbName) == 0 {
+		tbName = reflect.TypeOf(params.ItemToAdd).Name()
+	}
+
 	columnName := params.ColumnName
 
 	if len(params.NameWrapper) > 0 {
-		tableName = WrapNigger(tableName, params.NameWrapper)
+		tbName = WrapNigger(tbName, params.NameWrapper)
 	}
 
 	if len(columnName) > 0 {
 		if len(params.NameWrapper) > 0 {
 			columnName = WrapNigger(columnName, params.NameWrapper)
 		}
-		return "DELETE FROM " + tableName + " WHERE " + columnName + " = $1"
+		return "DELETE FROM " + tbName + " WHERE " + columnName + " = $1"
 	}
 
-	return "DELETE FROM " + tableName
+	return "DELETE FROM " + tbName
 }
 
 //endregion
@@ -327,27 +347,6 @@ func GetDeleteQuery(params QueryConfig) string {
 //endregion
 
 //region Share funcs
-
-func ConversionValToNonRefType(value any) reflect.Type {
-	typeOfVal := reflect.TypeOf(value)
-	kind := typeOfVal.Kind()
-
-	for kind == reflect.Pointer {
-		typeOfVal = typeOfVal.Elem()
-		kind = typeOfVal.Kind()
-	}
-	return typeOfVal
-}
-
-func ConversionTypeToNonRefType(t reflect.Type) reflect.Type {
-	kind := t.Kind()
-
-	for kind == reflect.Pointer {
-		t = t.Elem()
-		kind = t.Kind()
-	}
-	return t
-}
 
 func WrapNigger(n string, wrapper string) string {
 	return wrapper + n + wrapper
@@ -565,3 +564,14 @@ func getExcludedTagsKey(excluded []string) string {
 }
 
 //endregion
+
+func ConversionValToNonRefType(value any) reflect.Type {
+	typeOfVal := reflect.TypeOf(value)
+	kind := typeOfVal.Kind()
+
+	for kind == reflect.Pointer {
+		typeOfVal = typeOfVal.Elem()
+		kind = typeOfVal.Kind()
+	}
+	return typeOfVal
+}
