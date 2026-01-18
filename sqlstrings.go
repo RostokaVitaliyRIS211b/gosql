@@ -80,7 +80,7 @@ func GetInsertQuery(params QueryConfig) string {
 		tagName = params.TagName
 	}
 
-	typeOfN := TransformToNonRefType(params.ItemToAdd)
+	typeOfN := ConversionValToNonRefType(params.ItemToAdd)
 
 	numFields := typeOfN.NumField()
 
@@ -160,7 +160,7 @@ func GetInsertQuery(params QueryConfig) string {
 // ===============================================================================================================================
 // Returns a string like UPDATE TableName SET ColumnName1=$1  ItemFieldTag2=$2 ... [WHERE ColumnName = $1] , if you pass ColumnName, then WHERE ColumnName = $1 will be added to the end of the string and the argument for it must be the first in the argument list. For the rest, the order of the arguments must match the order of the fields in the passed structure
 func GetUpdateQuery(params QueryConfig) string {
-	typeOfN := TransformToNonRefType(params.ItemToAdd)
+	typeOfN := ConversionValToNonRefType(params.ItemToAdd)
 
 	counter := 0
 
@@ -239,7 +239,7 @@ func GetUpdateQuery(params QueryConfig) string {
 // Returns a string of type SELECT ItemFieldTag1, ItemFieldTag2 ... FROM TableName, if you pass columnName, WHERE columnName = $1 will be added to the end of the line, the argument for it must be the first in the argument list.
 func GetSelectQuery(params QueryConfig) string {
 	var builder strings.Builder
-	typeOfN := TransformToNonRefType(params.ItemToAdd)
+	typeOfN := ConversionValToNonRefType(params.ItemToAdd)
 	numOfFields := typeOfN.NumField()
 
 	additionalSymbols := 11
@@ -328,7 +328,7 @@ func GetDeleteQuery(params QueryConfig) string {
 
 //region Share funcs
 
-func TransformToNonRefType(value any) reflect.Type {
+func ConversionValToNonRefType(value any) reflect.Type {
 	typeOfVal := reflect.TypeOf(value)
 	kind := typeOfVal.Kind()
 
@@ -337,6 +337,16 @@ func TransformToNonRefType(value any) reflect.Type {
 		kind = typeOfVal.Kind()
 	}
 	return typeOfVal
+}
+
+func ConversionTypeToNonRefType(t reflect.Type) reflect.Type {
+	kind := t.Kind()
+
+	for kind == reflect.Pointer {
+		t = t.Elem()
+		kind = t.Kind()
+	}
+	return t
 }
 
 func WrapNigger(n string, wrapper string) string {
@@ -461,7 +471,7 @@ func GetCachedQuery(params QueryConfig, queryType QueryType) string {
 }
 
 func GetInsertQueryCached(params QueryConfig) string {
-	itemType := TransformToNonRefType(params.ItemToAdd)
+	itemType := ConversionValToNonRefType(params.ItemToAdd)
 
 	key := cacheKey{
 		Type:         itemType,
@@ -489,7 +499,7 @@ func GetInsertQueryCached(params QueryConfig) string {
 }
 
 func GetUpdateQueryCached(params QueryConfig) string {
-	itemType := TransformToNonRefType(params.ItemToAdd)
+	itemType := ConversionValToNonRefType(params.ItemToAdd)
 
 	key := cacheKey{
 		Type:         itemType,
@@ -517,7 +527,7 @@ func GetUpdateQueryCached(params QueryConfig) string {
 }
 
 func GetSelectQueryCached(params QueryConfig) string {
-	itemType := TransformToNonRefType(params.ItemToAdd)
+	itemType := ConversionValToNonRefType(params.ItemToAdd)
 
 	key := cacheKey{
 		Type:         itemType,

@@ -3,12 +3,11 @@ package gosql
 import (
 	"context"
 	"database/sql"
-	"reflect"
 	"sync/atomic"
 )
 
 type Scanner interface {
-	Scan(item any, tagName string, rows *sql.Rows, excludedTags []string) error
+	Scan(dest any, rows RowScanner, queryConfig QueryConfig) error
 }
 
 type DbHandler interface {
@@ -34,21 +33,21 @@ type StdDbHandler struct {
 }
 
 func (hn *StdDbHandler) SelectContext(context context.Context, dest []any, queryConfig QueryConfig, args ...any) error {
-	ogType := reflect.TypeOf(dest).Elem()
 
 	query := ""
 
-	rows, err := hn.db.QueryContext(context, query, args...)
+	if hn.useCachedFuncs.Load() {
+		query = GetSelectQueryCached(queryConfig)
+	} else {
+		query = GetSelectQuery(queryConfig)
+	}
 
+	rows, err := hn.db.QueryContext(context, query, args...)
 	if err != nil {
 		return err
 	}
 
-	for rows.Next() {
-		destValue := reflect.Zero(ogType).Interface()
-		err = hn.scanner.Scan(destValue, queryConfig.TagName, rows, queryConfig.ExcludedTags)
-		dest = append(dest, destValue)
-	}
+	err = hn.scanner.Scan(dest, rows, queryConfig)
 
 	return err
 }

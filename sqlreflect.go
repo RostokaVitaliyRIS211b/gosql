@@ -4,8 +4,14 @@ import (
 	"database/sql"
 	"errors"
 	"reflect"
+	"slices"
 	"sync"
 )
+
+type RowScanner interface {
+	Scan(dest ...any) error
+	Next() bool
+}
 
 type StdScanner struct {
 	Mapper *Mapper
@@ -14,30 +20,28 @@ type StdScanner struct {
 type Mapper struct {
 	TagName   string
 	cacheMaps map[reflect.Type]*TypeMap
-	mapFunc   func(t any, tagName string) (*TypeMap, error)
+	MapFunc   func(t reflect.Type, tagName string) (*TypeMap, error)
 	cacheLock sync.RWMutex
 }
 
 type TypeMap struct {
 	NonRefType reflect.Type
+	TagName    string
 	Fields     []*FieldInfo
 }
 
 type FieldInfo struct {
-	Name          string
-	FtypeNonRef   reflect.Type
-	FvalNonRef    reflect.Value
-	FTag          string
-	OriginalType  reflect.Type
-	OriginalValue reflect.Value
+	Name  string
+	Ftype reflect.Type
+	FTag  string
 }
 
 // map the item, panics if type of item isn`t struct or pointer to the struct
 // ===========================================================================================================
 // сопоставляет элемент, впадает в панику, если тип элемента не является struct или указателем на структуру
-func MapFunc(item any, tagName string) (*TypeMap, error) {
+func MapFunc(item reflect.Type, tagName string) (*TypeMap, error) {
 
-	ogItemType := reflect.TypeOf(item)
+	ogItemType := item
 
 	myerr := errors.New("type need to be either struct or pointer to the struct")
 
@@ -45,7 +49,7 @@ func MapFunc(item any, tagName string) (*TypeMap, error) {
 		return nil, myerr
 	}
 
-	nonRefItemType := TransformToNonRefType(ogItemType)
+	nonRefItemType := ConversionTypeToNonRefType(item)
 
 	if kind := nonRefItemType.Kind(); kind != reflect.Struct {
 		return nil, myerr
@@ -57,24 +61,15 @@ func MapFunc(item any, tagName string) (*TypeMap, error) {
 		field := nonRefItemType.Field(i)
 		columnName := field.Tag.Get(tagName)
 		ogType := field.Type
-		if len(columnName) > 0 && IsScannable(ogType) {
+		nonRefType := ConversionTypeToNonRefType(ogType)
+		if len(columnName) > 0 && field.IsExported() && IsScannable(nonRefType) && (ogType.Kind() != reflect.Pointer || (ogType.Kind() == reflect.Pointer && ogType.Elem() == nonRefType)) {
 			fieldInfo := &FieldInfo{}
 
-			ogValue := reflect.Zero(ogType)
-
-			fieldInfo.OriginalType = ogType
-			fieldInfo.OriginalValue = ogValue
-
-			nonRefType := TransformToNonRefType(item)
-			nonRefValue := reflect.Zero(nonRefItemType)
-
-			fieldInfo.FtypeNonRef = nonRefType
-			fieldInfo.FvalNonRef = nonRefValue
+			fieldInfo.Ftype = ogType
 
 			fieldInfo.Name = field.Name
 
 			fieldInfo.FTag = columnName
-
 			fields = append(fields, fieldInfo)
 		}
 
@@ -83,21 +78,57 @@ func MapFunc(item any, tagName string) (*TypeMap, error) {
 	return &TypeMap{
 		NonRefType: nonRefItemType,
 		Fields:     fields,
+		TagName:    tagName,
 	}, nil
 }
 
+var scannable = reflect.TypeFor[sql.Scanner]()
+
 func IsScannable(t reflect.Type) bool {
-	scannable := reflect.TypeFor[sql.Scanner]()
-	return reflect.PointerTo(scannable).Implements(scannable)
+	switch reflect.New(t).Interface().(type) {
+	case *int:
+		return true
+	case *[]byte:
+		return true
+	case *int8:
+		return true
+	case *int16:
+		return true
+	case *int32:
+		return true
+	case *int64:
+		return true
+	case *uint:
+		return true
+	case *uint8:
+		return true
+	case *uint16:
+		return true
+	case *uint32:
+		return true
+	case *uint64:
+		return true
+	case *bool:
+		return true
+	case *float32:
+		return true
+	case *float64:
+		return true
+	case *string:
+		return true
+	default:
+		return reflect.PointerTo(t).Implements(scannable)
+	}
 }
 
-func (mapper *Mapper) Map(item any, tagName string) (*TypeMap, error) {
-	nonRefType := TransformToNonRefType(item)
+func (mapper *Mapper) Map(item reflect.Type, tagName string) (*TypeMap, error) {
+	nonRefType := ConversionValToNonRefType(item)
 
 	var err error
 	mapper.cacheLock.RLock()
 	typeMap, ok := mapper.cacheMaps[nonRefType]
 	mapper.cacheLock.RUnlock()
+	ok = ok && (tagName == typeMap.TagName)
 
 	if ok {
 		return typeMap, nil
@@ -106,15 +137,152 @@ func (mapper *Mapper) Map(item any, tagName string) (*TypeMap, error) {
 	mapper.cacheLock.Lock()
 	defer mapper.cacheLock.Unlock()
 
-	typeMap, err = mapper.mapFunc(item, tagName)
+	typeMap, err = mapper.MapFunc(item, tagName)
 	if typeMap != nil {
 		mapper.cacheMaps[nonRefType] = typeMap
 	}
 	return typeMap, err
 }
 
-func (sc *StdScanner) Scan(item any, tagName string, rows *sql.Rows, excludedTags []string) error {
-	typeMap, err := sc.Mapper.Map(item, tagName)
-	_ = typeMap
+func (sc *StdScanner) Scan(dest any, rows RowScanner, queryConfig QueryConfig) error {
+
+	ogSliceType := reflect.TypeOf(dest)
+	if ogSliceType.Kind() != reflect.Pointer {
+		return errors.New("dest must be a pointer to slice")
+	}
+
+	nonRefSliceType := ogSliceType.Elem()
+
+	if nonRefSliceType.Kind() != reflect.Slice {
+		return errors.New("dest must be a slice")
+	}
+
+	nonRefSlice := reflect.New(nonRefSliceType).Elem()
+
+	sliceVal := reflect.ValueOf(dest).Elem()
+
+	if sliceVal.CanSet() {
+		sliceVal.Set(nonRefSlice)
+	} else {
+		return errors.New("dest cannot be set")
+	}
+
+	sliceVal.SetLen(0)
+
+	ogType := nonRefSliceType.Elem()
+	nonRefType := ConversionTypeToNonRefType(ogType)
+
+	typeMap, err := sc.Mapper.Map(ogType, queryConfig.TagName)
+
+	if err != nil {
+		return err
+	}
+
+	for rows.Next() {
+		itemZero := reflect.New(nonRefType)
+		err := rows.Scan(GetFieldsPointersOfItem(itemZero, typeMap, queryConfig.ExcludedTags)...)
+		if err == nil {
+			var ogVal any
+			ogVal, err = ConversionToOgType(itemZero.Elem().Interface(), ogType)
+			if err == nil {
+				sliceVal.Set(reflect.Append(sliceVal, reflect.ValueOf(ogVal)))
+			}
+		}
+	}
+
 	return err
+}
+
+// Get pointers to fields of item, then give it in rows.Scan(), here you need to pass a pointer to the structure
+// ===================================================================================================
+// Получаем указатели на поля элемента, затем передаем их в rows.Scan(), сюда нужно передавать указатель на структуру
+func GetFieldsPointersOfItem(item reflect.Value, tmap *TypeMap, excludedTags []string) []any {
+	var pointers []any
+	t := item.Type()
+	if t.Kind() != reflect.Pointer && t.Elem().Kind() != reflect.Struct {
+		return pointers
+	}
+
+	v := item.Elem()
+
+	for _, fieldInfo := range tmap.Fields {
+		if !slices.Contains(excludedTags, fieldInfo.FTag) {
+			field := v.FieldByName(fieldInfo.Name)
+			if fieldInfo.Ftype.Kind() == reflect.Pointer {
+				if field.CanSet() {
+					field.Set(reflect.New(field.Type().Elem()))
+				}
+				pointers = append(pointers, field.Interface())
+			} else if field.CanAddr() {
+				pointers = append(pointers, field.Addr().Interface())
+			}
+		}
+	}
+
+	return pointers
+}
+
+// Conversion to the original type, it can be *User, but I can only get fields from the type from User, and I need to return *User back
+// ============================================================================================================
+// Приведение в исходный тип, он может быть *User, но я могу получить поля только от типа от User, и мне нужно вернуть обратно *User
+func ConversionToOgType(item any, og reflect.Type) (any, error) {
+	var res any
+	t := reflect.TypeOf(item)
+
+	if t == og {
+		return item, nil
+	}
+
+	if og.Kind() != reflect.Pointer {
+		return nil, errors.New("type need to be either struct or pointer to the struct...")
+	}
+
+	v := reflect.New(t)
+	elem := v.Elem()
+
+	if elem.CanSet() {
+		elem.Set(reflect.ValueOf(item))
+		t = v.Type()
+	} else {
+		return nil, errors.New("somehow value cannot be set")
+	}
+
+	ogV := reflect.New(og).Elem()
+
+	for t != og {
+
+		nv := reflect.New(t)
+		elem = nv.Elem()
+
+		if elem.CanSet() {
+			elem.Set(v)
+			v = nv
+			t = v.Type()
+		} else {
+			return nil, errors.New("somehow value cannot be set")
+		}
+	}
+
+	if ogV.CanSet() {
+		ogV.Set(v)
+		res = ogV.Interface()
+	} else {
+		return nil, errors.New("og type cannot be set")
+	}
+
+	return res, nil
+}
+
+func GetMapper(tagName string) *Mapper {
+	return &Mapper{
+		TagName:   tagName,
+		MapFunc:   MapFunc,
+		cacheMaps: map[reflect.Type]*TypeMap{},
+	}
+}
+
+func GetScanner(tagName string) Scanner {
+	return &StdScanner{
+		Mapper: GetMapper(tagName),
+	}
 }
