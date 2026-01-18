@@ -125,10 +125,10 @@ func TestInsertQuery(t *testing.T) {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+insertQuery3+"\n"+res)
 	}
 
-	res = GetInsertQuery(query.ChangeTable("", users{}).ChangeTagName(tagName))
+	res = GetInsertQuery(query.ChangeTable("", users{}).ChangeTagName(tagName).ChangeNameWrapper(wrapper))
 
-	if res != insertQuery1 {
-		t.Errorf("%s", "QUERIES NOT MATCH\n"+insertQuery3+"\n"+res)
+	if res != insertQuery2 {
+		t.Errorf("%s", "QUERIES NOT MATCH\n"+insertQuery2+"\n"+res)
 	}
 }
 
@@ -165,10 +165,10 @@ func TestSelectQuery(t *testing.T) {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+selectQuery3+"\n"+res)
 	}
 
-	res = GetSelectQuery(query.ChangeTable("", users{}).ChangeTagName(tagName))
+	res = GetSelectQuery(query.ChangeTable("", users{}).ChangeTagName(tagName).ChangeNameWrapper(wrapper))
 
-	if res != selectQuery1 {
-		t.Errorf("%s", "QUERIES NOT MATCH\n"+selectQuery1+"\n"+res)
+	if res != selectQuery2 {
+		t.Errorf("%s", "QUERIES NOT MATCH\n"+selectQuery2+"\n"+res)
 	}
 }
 
@@ -205,10 +205,10 @@ func TestUpdateQuery(t *testing.T) {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+updateQuery3+"\n"+res)
 	}
 
-	res = GetUpdateQuery(query.ChangeTable("", users{}).ChangeTagName(tagName))
+	res = GetUpdateQuery(query.ChangeTable("", users{}).ChangeTagName(tagName).ChangeNameWrapper(wrapper))
 
-	if res != updateQuery1 {
-		t.Errorf("%s", "QUERIES NOT MATCH\n"+updateQuery1+"\n"+res)
+	if res != updateQuery2 {
+		t.Errorf("%s", "QUERIES NOT MATCH\n"+updateQuery2+"\n"+res)
 	}
 }
 
@@ -245,10 +245,10 @@ func TestDeleteQuery(t *testing.T) {
 		t.Errorf("%s", "QUERIES NOT MATCH\n"+deleteQuery3+"\n"+res)
 	}
 
-	res = GetDeleteQuery(query.ChangeTable("", users{}).ChangeTagName(tagName))
+	res = GetDeleteQuery(query.ChangeTable("", users{}).ChangeTagName(tagName).ChangeNameWrapper(wrapper))
 
-	if res != deleteQuery1 {
-		t.Errorf("%s", "QUERIES NOT MATCH\n"+deleteQuery1+"\n"+res)
+	if res != deleteQuery2 {
+		t.Errorf("%s", "QUERIES NOT MATCH\n"+deleteQuery2+"\n"+res)
 	}
 
 }

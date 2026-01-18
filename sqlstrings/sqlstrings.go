@@ -80,6 +80,10 @@ func GetInsertQuery(params QueryConfig) string {
 		tagName = params.TagName
 	}
 
+	if params.ItemToAdd == nil {
+		return "ItemToAdd is nil fix that"
+	}
+
 	typeOfN := ConversionValToNonRefType(params.ItemToAdd)
 
 	numFields := typeOfN.NumField()
@@ -165,6 +169,11 @@ func GetInsertQuery(params QueryConfig) string {
 // ===============================================================================================================================
 // Returns a string like UPDATE TableName SET ColumnName1=$1  ItemFieldTag2=$2 ... [WHERE ColumnName = $1] , if you pass ColumnName, then WHERE ColumnName = $1 will be added to the end of the string and the argument for it must be the first in the argument list. For the rest, the order of the arguments must match the order of the fields in the passed structure
 func GetUpdateQuery(params QueryConfig) string {
+
+	if params.ItemToAdd == nil {
+		return "ItemToAdd is nil fix that"
+	}
+
 	typeOfN := ConversionValToNonRefType(params.ItemToAdd)
 
 	counter := 0
@@ -248,6 +257,11 @@ func GetUpdateQuery(params QueryConfig) string {
 // ==============================================================================================================================
 // Returns a string of type SELECT ItemFieldTag1, ItemFieldTag2 ... FROM TableName, if you pass columnName, WHERE columnName = $1 will be added to the end of the line, the argument for it must be the first in the argument list.
 func GetSelectQuery(params QueryConfig) string {
+
+	if params.ItemToAdd == nil {
+		return "ItemToAdd is nil fix that"
+	}
+
 	var builder strings.Builder
 	typeOfN := ConversionValToNonRefType(params.ItemToAdd)
 	numOfFields := typeOfN.NumField()
@@ -296,7 +310,7 @@ func GetSelectQuery(params QueryConfig) string {
 	}
 
 	if len(params.NameWrapper) > 0 {
-		tbname = WrapNigger(params.TableName, params.NameWrapper)
+		tbname = WrapNigger(tbname, params.NameWrapper)
 	}
 
 	builder.WriteString(tbname)
@@ -438,9 +452,9 @@ func requiredProcessing(new *QueryConfig, old *QueryConfig) *QueryConfig {
 //region Caching
 
 var (
-	insertQueryCache map[cacheKey]string
-	selectQueryCache map[cacheKey]string
-	updateQueryCache map[cacheKey]string
+	insertQueryCache map[cacheKey]string = map[cacheKey]string{}
+	selectQueryCache map[cacheKey]string = map[cacheKey]string{}
+	updateQueryCache map[cacheKey]string = map[cacheKey]string{}
 	cacheMutex       sync.RWMutex
 )
 

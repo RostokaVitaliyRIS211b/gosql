@@ -320,7 +320,7 @@ func TestScan(t *testing.T) {
 
 	var users []user
 
-	stdScanner := GetScanner(tagName)
+	stdScanner := GetScanner()
 
 	stdScanner.Scan(&users, rowScanner, queryConfig)
 

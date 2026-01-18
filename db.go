@@ -76,37 +76,14 @@ func (stdh *StdDbHandler) ExecContext(context context.Context, query string, _ s
 // ======================================================================================
 // dest should be a pointer to slice
 func (stdh *StdDbHandler) Select(dest any, query string, queryConfig sqlstrings.QueryConfig, args ...any) error {
-
-	stdh.dbMutex.RLock()
-	rows, err := stdh.db.Query(query, args...)
-	stdh.dbMutex.RUnlock()
-
-	if err != nil {
-		return err
-	}
-
-	stdh.scannerMutex.RLock()
-	defer stdh.scannerMutex.RUnlock()
-	err = stdh.scanner.Scan(dest, rows, queryConfig)
-
-	return err
+	return stdh.SelectContext(context.Background(), dest, query, queryConfig, args...)
 }
 func (stdh *StdDbHandler) Insert(query string, queryConfig sqlstrings.QueryConfig, args ...any) (id int, err error) {
-
-	stdh.dbMutex.RLock()
-	defer stdh.dbMutex.RUnlock()
-	err = stdh.db.QueryRow(query, args...).Scan(&id)
-
-	return id, err
-
+	return stdh.InsertContext(context.Background(), query, queryConfig, args...)
 }
 
-func (stdh *StdDbHandler) Exec(query string, _ sqlstrings.QueryConfig, args ...any) (int, error) {
-	stdh.dbMutex.RLock()
-	defer stdh.dbMutex.RUnlock()
-	res, err := stdh.db.Exec(query, args...)
-	aff, _ := res.RowsAffected()
-	return (int)(aff), err
+func (stdh *StdDbHandler) Exec(query string, queryConfig sqlstrings.QueryConfig, args ...any) (int, error) {
+	return stdh.ExecContext(context.Background(), query, queryConfig, args...)
 }
 
 // Этот метод блокирует вызывающую горутину пока Scanner не станет доступен для записи
@@ -140,9 +117,12 @@ func GetStdDbHandler(db *sql.DB) DbHandler {
 //region DB Methods
 
 func GetDb(db *sql.DB, id string) *DB {
+	atom := atomic.Bool{}
+	atom.Store(true)
 	return &DB{
-		handler: GetStdDbHandler(db),
-		Id:      id,
+		handler:        GetStdDbHandler(db),
+		Id:             id,
+		useCachedFuncs: &atom,
 	}
 }
 
@@ -191,7 +171,7 @@ func (db *DB) SelectContext(context context.Context, queryConfig sqlstrings.Quer
 // ======================================================================================
 // dest should be a pointer to struct
 func (db *DB) Get(queryConfig sqlstrings.QueryConfig, dest any, args ...any) error {
-	return db.GetContext(context.Background(), queryConfig, dest, args)
+	return db.GetContext(context.Background(), queryConfig, dest, args...)
 }
 
 // dest должен быть указателем на структуру
@@ -215,7 +195,9 @@ func (db *DB) GetContext(context context.Context, queryConfig sqlstrings.QueryCo
 		return errors.New("dest must be a pointer to the struct")
 	}
 
-	slice := reflect.MakeSlice(tstruct, 0, 0)
+	typeSlice := reflect.SliceOf(tstruct)
+
+	slicePointer := reflect.New(typeSlice)
 
 	query := ""
 
@@ -226,8 +208,14 @@ func (db *DB) GetContext(context context.Context, queryConfig sqlstrings.QueryCo
 	}
 
 	db.handlerMutex.RLock()
-	err := db.handler.SelectContext(context, slice, query, queryConfig, args)
+	err := db.handler.SelectContext(context, slicePointer.Interface(), query, queryConfig, args...)
 	db.handlerMutex.RUnlock()
+
+	if err != nil {
+		return err
+	}
+
+	slice := slicePointer.Elem()
 
 	length := slice.Len()
 	if length == 0 {
@@ -238,11 +226,9 @@ func (db *DB) GetContext(context context.Context, queryConfig sqlstrings.QueryCo
 		return errors.New("result set have more than 1 element")
 	}
 
-	val := reflect.ValueOf(dest)
+	val := reflect.ValueOf(dest).Elem()
 	if val.CanSet() {
-		newVal := reflect.New(tstruct)
-		newVal.Elem().Set(slice.Index(0))
-		val.Set(newVal)
+		val.Set(slice.Index(0))
 	}
 
 	return err
@@ -264,11 +250,11 @@ func (db *DB) InsertContext(context context.Context, queryConfig sqlstrings.Quer
 		query = sqlstrings.GetInsertQuery(queryConfig)
 	}
 
-	return db.handler.InsertContext(context, query, queryConfig, args...)
+	return db.handler.InsertContext(context, query, queryConfig, args)
 }
 
 func (db *DB) Update(queryConfig sqlstrings.QueryConfig, args ...any) (int, error) {
-	return db.UpdateContext(context.Background(), queryConfig, args)
+	return db.UpdateContext(context.Background(), queryConfig, args...)
 }
 
 func (db *DB) UpdateContext(context context.Context, queryConfig sqlstrings.QueryConfig, args ...any) (int, error) {
@@ -282,14 +268,14 @@ func (db *DB) UpdateContext(context context.Context, queryConfig sqlstrings.Quer
 	}
 
 	db.handlerMutex.RLock()
-	res, err := db.handler.ExecContext(context, query, queryConfig, args...)
+	res, err := db.handler.ExecContext(context, query, queryConfig, args)
 	db.handlerMutex.RUnlock()
 
 	return res, err
 }
 
 func (db *DB) Delete(queryConfig sqlstrings.QueryConfig, args ...any) (int, error) {
-	return db.DeleteContext(context.Background(), queryConfig, args)
+	return db.DeleteContext(context.Background(), queryConfig, args...)
 }
 
 func (db *DB) DeleteContext(context context.Context, queryConfig sqlstrings.QueryConfig, args ...any) (int, error) {
@@ -304,7 +290,7 @@ func (db *DB) DeleteContext(context context.Context, queryConfig sqlstrings.Quer
 }
 
 func (db *DB) Exec(query string, args ...any) (int, error) {
-	return db.ExecContext(context.Background(), query, args...)
+	return db.ExecContext(context.Background(), query, args)
 }
 
 func (db *DB) ExecContext(context context.Context, query string, args ...any) (int, error) {

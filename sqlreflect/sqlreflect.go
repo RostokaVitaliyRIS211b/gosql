@@ -24,7 +24,6 @@ type StdScanner struct {
 }
 
 type Mapper struct {
-	TagName   string
 	cacheMaps map[reflect.Type]*TypeMap
 	MapFunc   func(t reflect.Type, tagName string) (*TypeMap, error)
 	cacheLock sync.RWMutex
@@ -208,7 +207,7 @@ func GetFieldsPointersOfItem(item reflect.Value, tmap *TypeMap, excludedTags []s
 			field := v.FieldByName(fieldInfo.Name)
 			if fieldInfo.Ftype.Kind() == reflect.Pointer {
 				if field.CanSet() {
-					field.Set(reflect.New(field.Type().Elem()))
+					field.Set(reflect.New(fieldInfo.Ftype.Elem()))
 				}
 				pointers = append(pointers, field.Interface())
 			} else if field.CanAddr() {
@@ -282,17 +281,16 @@ func ConversionValToNonRefType(value any) reflect.Type {
 	return typeOfVal
 }
 
-func GetMapper(tagName string) *Mapper {
+func GetMapper() *Mapper {
 	return &Mapper{
-		TagName:   tagName,
 		MapFunc:   MapFunc,
 		cacheMaps: map[reflect.Type]*TypeMap{},
 	}
 }
 
-func GetScanner(tagName string) Scanner {
+func GetScanner() Scanner {
 	return &StdScanner{
-		Mapper: GetMapper(tagName),
+		Mapper: GetMapper(),
 	}
 }
 
