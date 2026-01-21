@@ -252,3 +252,20 @@ func TestDeleteQuery(t *testing.T) {
 	}
 
 }
+
+func TestJoin(t *testing.T) {
+	query := "SELECT \"Permissions\".\"Id\", \"Permissions\".\"Name\" FROM \"Permissions\" " +
+		"JOIN \"PermissionsForRoles\" ON \"Permissions\".\"Id\" = \"PermissionsForRoles\".\"PermId\" " +
+		"JOIN \"Roles\" ON \"PermissionsForRoles\".\"RoleId\" = \"Roles\".\"Id\" " +
+		"JOIN \"RolesOfUsers\" ON \"Roles\".\"Id\" = \"RolesOfUsers\".\"RoleId\" " +
+		"JOIN \"Users\" ON \"RolesOfUsers\".\"UserId\" = \"Users\".\"Id\" " +
+		"WHERE \"Users\".\"Id\"=$1"
+	tableColumn := TC{TableName: "Permissions", ColumnName: "Id"}
+	genQuery := config.StartJoin("Permissions", tableColumn, tableColumn.C("Name")).Join("Id", TCC("PermissionsForRoles", "PermId")).
+		Join("RoleId", TCC("Roles", "Id")).Join("Id", TCC("RolesOfUsers", "RoleId")).Join("UserId", TCC("Users", "Id")).Result(TCC("Users", "Id"))
+
+	if query != genQuery {
+		t.Errorf("queries don`t match %s", query+" <- OG \n"+genQuery+" <- FAKE")
+	}
+
+}

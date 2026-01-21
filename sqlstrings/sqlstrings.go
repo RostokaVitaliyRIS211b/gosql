@@ -93,9 +93,6 @@ func GetInsertQuery(params QueryConfig) string {
 	//Выделяем память под символы сразу
 	builder.Grow(totalSymbols)
 
-	builder.WriteString("INSERT")
-	builder.WriteString(" INTO ")
-
 	//Если указан NameWrapper то оборачиваем в него имя таблицы
 	tbname := params.TableName
 
@@ -106,9 +103,7 @@ func GetInsertQuery(params QueryConfig) string {
 	if len(params.NameWrapper) > 0 {
 		tbname = WrapNigger(tbname, params.NameWrapper)
 	}
-	builder.WriteString(tbname)
-
-	builder.WriteString(" (")
+	builder.WriteString("INSERT INTO " + tbname + " (")
 
 	counter := 0
 
@@ -145,8 +140,7 @@ func GetInsertQuery(params QueryConfig) string {
 		if idx > 0 {
 			builder.WriteString(",")
 		}
-		builder.WriteString("$")
-		builder.WriteString(strconv.Itoa(idx + 1))
+		builder.WriteString("$" + strconv.Itoa(idx+1))
 	}
 
 	builder.WriteString(")")
@@ -191,8 +185,6 @@ func GetUpdateQuery(params QueryConfig) string {
 		tagName = params.TagName
 	}
 
-	builder.WriteString("UPDATE ")
-
 	tbname := params.TableName
 
 	if len(tbname) == 0 {
@@ -202,9 +194,8 @@ func GetUpdateQuery(params QueryConfig) string {
 	if len(params.NameWrapper) > 0 {
 		tbname = WrapNigger(tbname, params.NameWrapper)
 	}
-	builder.WriteString(tbname)
 
-	builder.WriteString(" SET ")
+	builder.WriteString("UPDATE " + tbname + " SET ")
 
 	adder := 1
 
@@ -229,21 +220,17 @@ func GetUpdateQuery(params QueryConfig) string {
 			if len(params.NameWrapper) > 0 {
 				tag = WrapNigger(tag, params.NameWrapper)
 			}
-			builder.WriteString(tag)
-			builder.WriteString(" = $")
-			builder.WriteString(strconv.Itoa(counter + adder))
+			builder.WriteString(tag + " = $" + strconv.Itoa(counter+adder))
 			counter++
 		}
 	}
 
 	if len(params.ColumnName) > 0 {
-		builder.WriteString(" WHERE ")
 		filterColumnName := params.ColumnName
 		if len(params.NameWrapper) > 0 {
 			filterColumnName = WrapNigger(filterColumnName, params.NameWrapper)
 		}
-		builder.WriteString(filterColumnName)
-		builder.WriteString(" = $1")
+		builder.WriteString(" WHERE " + filterColumnName + " = $1")
 	}
 
 	return builder.String()
@@ -301,8 +288,6 @@ func GetSelectQuery(params QueryConfig) string {
 
 	}
 
-	builder.WriteString(" FROM ")
-
 	tbname := params.TableName
 
 	if len(tbname) == 0 {
@@ -313,7 +298,7 @@ func GetSelectQuery(params QueryConfig) string {
 		tbname = WrapNigger(tbname, params.NameWrapper)
 	}
 
-	builder.WriteString(tbname)
+	builder.WriteString(" FROM " + tbname)
 
 	if len(params.ColumnName) > 0 {
 		builder.WriteString(" WHERE ")
@@ -589,3 +574,92 @@ func ConversionValToNonRefType(value any) reflect.Type {
 	}
 	return typeOfVal
 }
+
+//region Join
+
+type JoinQuery struct {
+	queryConfig       *QueryConfig
+	builder           *strings.Builder
+	previousTableName string
+}
+
+type TC struct {
+	TableName  string
+	ColumnName string
+}
+
+func (tc TC) T(tableName string) TC {
+	return TC{
+		TableName:  tableName,
+		ColumnName: tc.ColumnName,
+	}
+}
+
+func (tc TC) C(columnName string) TC {
+	return TC{
+		TableName:  tc.TableName,
+		ColumnName: columnName,
+	}
+}
+
+func TCC(tableName string, columnName string) TC {
+	return TC{
+		TableName:  tableName,
+		ColumnName: columnName,
+	}
+}
+
+func (q QueryConfig) StartJoin(startTableName string, pairs ...TC) *JoinQuery {
+	var builder strings.Builder
+	growCount := len(pairs)*8 + 14 + len(startTableName)
+	builder.Grow(growCount)
+	builder.WriteString("SELECT ")
+
+	for idx, val := range pairs {
+
+		additionalStr := ""
+
+		if idx != len(pairs)-1 {
+			additionalStr = ", "
+		}
+
+		builder.WriteString(WrapNigger(val.TableName, q.NameWrapper) + "." + WrapNigger(val.ColumnName, q.NameWrapper) + additionalStr)
+	}
+
+	wrapped := WrapNigger(startTableName, q.NameWrapper)
+
+	builder.WriteString(" FROM " + wrapped)
+
+	return &JoinQuery{
+		queryConfig:       &q,
+		builder:           &builder,
+		previousTableName: wrapped,
+	}
+}
+
+func (j *JoinQuery) Join(previousTableColumnName string, newJoinedTable TC) *JoinQuery {
+	growCount := 15 + len(previousTableColumnName) + len(newJoinedTable.TableName) + len(newJoinedTable.ColumnName) + len(j.previousTableName)
+	j.builder.Grow(growCount)
+	wrapped := WrapNigger(newJoinedTable.TableName, j.queryConfig.NameWrapper)
+	j.builder.WriteString(" JOIN " + wrapped + " ON " + j.previousTableName + "." +
+		WrapNigger(previousTableColumnName, j.queryConfig.NameWrapper) + " = " + wrapped + "." + WrapNigger(newJoinedTable.ColumnName, j.queryConfig.NameWrapper))
+	j.previousTableName = wrapped
+	return j
+}
+
+func (j *JoinQuery) Result(pairs ...TC) string {
+	growCount := j.builder.Len() + len(pairs)*8
+	var newBuilder strings.Builder
+	newBuilder.Grow(growCount)
+	newBuilder.WriteString(j.builder.String() + " WHERE ")
+	for idx, val := range pairs {
+		additionalStr := ""
+		if idx != len(pairs)-1 {
+			additionalStr = ", "
+		}
+		newBuilder.WriteString(WrapNigger(val.TableName, j.queryConfig.NameWrapper) + "." + WrapNigger(val.ColumnName, j.queryConfig.NameWrapper) + "=$" + strconv.Itoa(idx+1) + additionalStr)
+	}
+	return newBuilder.String()
+}
+
+//endregion
