@@ -376,3 +376,95 @@ func TestScan(t *testing.T) {
 	}
 
 }
+
+func TestGetFieldsValuesOfItem(t *testing.T) {
+	type user struct {
+		Name  string  `db:"Name"`
+		Name2 int     `db:"Name2"`
+		Name3 float64 `db:"Name3"`
+		Name4 []byte  `db:"Name4"`
+		Name5 []int
+	}
+
+	type user2 struct {
+		Name  *string  `dbcn:"Name"`
+		Name2 *int     `dbcn:"Name2"`
+		Name3 *float64 `dbcn:"Name3"`
+		Name4 *[]byte  `dbcn:"Name4"`
+		Name5 []int
+	}
+
+	const tagName, tagName2 = "db", "dbcn"
+
+	nstr := "123"
+	ni := 1
+	f64n := 42.1
+	bsn := []byte{0x8}
+
+	var userFiels []any
+
+	val := user{Name: nstr, Name2: ni, Name3: f64n, Name4: bsn}
+
+	Mapper := GetMapper()
+	typeMap, err := Mapper.Map(reflect.TypeFor[user](), tagName)
+	if err != nil {
+		t.Errorf("error in mapper %s", err.Error())
+	}
+
+	userFiels = GetFieldsValuesOfItem(val, typeMap, []string{})
+
+	if len(userFiels) != 4 {
+		t.Errorf("GetFieldsValuesOfItem failed")
+	}
+
+	if string(userFiels[3].([]byte)) != string(bsn) {
+		t.Errorf("user Name4 not match")
+	}
+
+	if userFiels[2].(float64) != f64n {
+		t.Errorf("user Name3 not match")
+	}
+
+	if userFiels[1].(int) != ni {
+		t.Errorf("user Name2 not match")
+	}
+
+	if userFiels[0].(string) != nstr {
+		t.Errorf("user Name not match")
+	}
+
+	nstr = "hello goida"
+	ni = 67
+	f64n = 67.67
+	bsn = []byte{0xF}
+
+	val2 := user2{Name: &nstr, Name2: &ni, Name3: &f64n, Name4: &bsn}
+
+	var userFiels2 []any
+	typeMap, err = Mapper.Map(reflect.TypeFor[user2](), tagName)
+
+	if err != nil {
+		t.Errorf("error in mapper %s", err.Error())
+	}
+
+	userFiels2 = GetFieldsValuesOfItem(val2, typeMap, []string{})
+	if len(userFiels2) != 4 {
+		t.Errorf("GetFieldsValuesOfItem2 failed")
+	}
+
+	if string(userFiels2[3].([]byte)) != string(bsn) {
+		t.Errorf("user Name4 not match")
+	}
+
+	if userFiels2[2].(float64) != f64n {
+		t.Errorf("user Name3 not match")
+	}
+
+	if userFiels2[1].(int) != ni {
+		t.Errorf("user Name2 not match")
+	}
+
+	if userFiels2[0].(string) != nstr {
+		t.Errorf("user Name not match")
+	}
+}

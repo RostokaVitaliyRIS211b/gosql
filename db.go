@@ -26,6 +26,8 @@ type DB struct {
 	handler        DbHandler
 	handlerMutex   sync.RWMutex
 	useCachedFuncs *atomic.Bool
+	mapper         *sqlreflect.Mapper
+	mapperMutex    sync.RWMutex
 }
 
 type StdDbHandler struct {
@@ -119,11 +121,27 @@ func GetStdDbHandler(db *sql.DB) DbHandler {
 func GetDb(db *sql.DB, id string) *DB {
 	atom := atomic.Bool{}
 	atom.Store(true)
+	handler := GetStdDbHandler(db)
+	var mapper *sqlreflect.Mapper
+	stdh, ok := handler.(*StdDbHandler)
+	if ok {
+		stds, ok2 := stdh.scanner.(*sqlreflect.StdScanner)
+		if ok2 {
+			mapper = stds.Mapper
+		}
+	}
 	return &DB{
-		handler:        GetStdDbHandler(db),
+		handler:        handler,
 		Id:             id,
 		useCachedFuncs: &atom,
+		mapper:         mapper,
 	}
+}
+
+func (db *DB) SetMapper(mapper *sqlreflect.Mapper) {
+	db.mapperMutex.Lock()
+	defer db.mapperMutex.Unlock()
+	db.mapper = mapper
 }
 
 // dest должен быть указателем на slice
@@ -234,10 +252,16 @@ func (db *DB) GetContext(context context.Context, queryConfig sqlstrings.QueryCo
 	return err
 }
 
+// Если аргументы пусты, маппер присутствует  и queryConfig.ItemToAdd != nil, тогда аргументы будут взяты из queryConfig.ItemToAdd, если хотите отключить такое поведение вызовите SetMapper(nil)
+// ================================================================================================================================
+// If the arguments are empty, the mapper is present and queryConfig.ItemToAdd != nil, then the arguments will be taken from queryConfig.ItemToAdd, if you want to disable this behavior, call SetMapper(nil)
 func (db *DB) Insert(queryConfig sqlstrings.QueryConfig, args ...any) (int, error) {
 	return db.InsertContext(context.Background(), queryConfig, args...)
 }
 
+// Если аргументы пусты, маппер присутствует  и queryConfig.ItemToAdd != nil, тогда аргументы будут взяты из queryConfig.ItemToAdd, если хотите отключить такое поведение вызовите SetMapper(nil)
+// ================================================================================================================================
+// If the arguments are empty, the mapper is present and queryConfig.ItemToAdd != nil, then the arguments will be taken from queryConfig.ItemToAdd, if you want to disable this behavior, call SetMapper(nil)
 func (db *DB) InsertContext(context context.Context, queryConfig sqlstrings.QueryConfig, args ...any) (int, error) {
 	db.handlerMutex.RLock()
 	defer db.handlerMutex.RUnlock()
@@ -250,13 +274,30 @@ func (db *DB) InsertContext(context context.Context, queryConfig sqlstrings.Quer
 		query = sqlstrings.GetInsertQuery(queryConfig)
 	}
 
-	return db.handler.InsertContext(context, query, queryConfig, args)
+	if len(args) == 0 && queryConfig.ItemToAdd != nil && db.mapper != nil {
+		db.mapperMutex.RLock()
+		typeMap, err := db.mapper.Map(reflect.TypeOf(queryConfig.ItemToAdd), queryConfig.TagName)
+		db.mapperMutex.RUnlock()
+		if err != nil {
+			return -1, err
+		}
+
+		args = sqlreflect.GetFieldsValuesOfItem(queryConfig.ItemToAdd, typeMap, queryConfig.ExcludedTags)
+	}
+
+	return db.handler.InsertContext(context, query, queryConfig, args...)
 }
 
+// Если аргументы пусты, маппер присутствует  и queryConfig.ItemToAdd != nil, тогда аргументы будут взяты из queryConfig.ItemToAdd, если хотите отключить такое поведение вызовите SetMapper(nil)
+// ================================================================================================================================
+// If the arguments are empty, the mapper is present and queryConfig.ItemToAdd != nil, then the arguments will be taken from queryConfig.ItemToAdd, if you want to disable this behavior, call SetMapper(nil)
 func (db *DB) Update(queryConfig sqlstrings.QueryConfig, args ...any) (int, error) {
 	return db.UpdateContext(context.Background(), queryConfig, args...)
 }
 
+// Если аргументы пусты, маппер присутствует  и queryConfig.ItemToAdd != nil, тогда аргументы будут взяты из queryConfig.ItemToAdd, если хотите отключить такое поведение вызовите SetMapper(nil)
+// ================================================================================================================================
+// If the arguments are empty, the mapper is present and queryConfig.ItemToAdd != nil, then the arguments will be taken from queryConfig.ItemToAdd, if you want to disable this behavior, call SetMapper(nil)
 func (db *DB) UpdateContext(context context.Context, queryConfig sqlstrings.QueryConfig, args ...any) (int, error) {
 
 	query := ""
@@ -267,8 +308,19 @@ func (db *DB) UpdateContext(context context.Context, queryConfig sqlstrings.Quer
 		query = sqlstrings.GetUpdateQuery(queryConfig)
 	}
 
+	if len(args) == 0 && queryConfig.ItemToAdd != nil && db.mapper != nil {
+		db.mapperMutex.RLock()
+		typeMap, err := db.mapper.Map(reflect.TypeOf(queryConfig.ItemToAdd), queryConfig.TagName)
+		db.mapperMutex.RUnlock()
+		if err != nil {
+			return -1, err
+		}
+
+		args = sqlreflect.GetFieldsValuesOfItem(queryConfig.ItemToAdd, typeMap, queryConfig.ExcludedTags)
+	}
+
 	db.handlerMutex.RLock()
-	res, err := db.handler.ExecContext(context, query, queryConfig, args)
+	res, err := db.handler.ExecContext(context, query, queryConfig, args...)
 	db.handlerMutex.RUnlock()
 
 	return res, err
@@ -290,7 +342,7 @@ func (db *DB) DeleteContext(context context.Context, queryConfig sqlstrings.Quer
 }
 
 func (db *DB) Exec(query string, args ...any) (int, error) {
-	return db.ExecContext(context.Background(), query, args)
+	return db.ExecContext(context.Background(), query, args...)
 }
 
 func (db *DB) ExecContext(context context.Context, query string, args ...any) (int, error) {

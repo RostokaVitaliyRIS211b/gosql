@@ -219,6 +219,38 @@ func GetFieldsPointersOfItem(item reflect.Value, tmap *TypeMap, excludedTags []s
 	return pointers
 }
 
+func GetFieldsValuesOfItem(item any, tmap *TypeMap, excludedTags []string) []any {
+	var args []any
+
+	GetNonRefVal := func(val reflect.Value) reflect.Value {
+		t := val.Type()
+		for t.Kind() == reflect.Pointer || t.Kind() == reflect.Interface {
+			val = val.Elem()
+			t = val.Type()
+		}
+		return val
+	}
+
+	if item == nil {
+		return args
+	}
+
+	val := GetNonRefVal(reflect.ValueOf(item))
+
+	for _, fieldInfo := range tmap.Fields {
+		if !slices.Contains(excludedTags, fieldInfo.FTag) {
+			field := val.FieldByName(fieldInfo.Name)
+			if field.Kind() == reflect.Pointer && !field.IsNil() {
+				args = append(args, field.Elem().Interface())
+			} else {
+				args = append(args, field.Interface())
+			}
+		}
+	}
+
+	return args
+}
+
 // Conversion to the original type, it can be *User, but I can only get fields from the type from User, and I need to return *User back
 // ============================================================================================================
 // Приведение в исходный тип, он может быть *User, но я могу получить поля только от типа от User, и мне нужно вернуть обратно *User
