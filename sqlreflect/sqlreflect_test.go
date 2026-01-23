@@ -295,11 +295,11 @@ func TestScan(t *testing.T) {
 	}
 
 	type user2 struct {
-		Name  *string  `dbcn:"Name"`
-		Name2 *int     `dbcn:"Name2"`
-		Name3 *float64 `dbcn:"Name3"`
-		Name4 *[]byte  `dbcn:"Name4"`
-		Name5 []int
+		SName  *string  `dbcn:"Name"`
+		IName2 *int     `dbcn:"Name2"`
+		FName3 *float64 `dbcn:"Name3"`
+		BName4 *[]byte  `dbcn:"Name4"`
+		Name5  []int
 	}
 
 	const tagName, tagName2 = "db", "dbcn"
@@ -359,19 +359,19 @@ func TestScan(t *testing.T) {
 		t.Errorf("scan failed")
 	}
 
-	if *users2[0].Name != nstr {
+	if *users2[0].SName != nstr {
 		t.Errorf("user Name not match")
 	}
 
-	if *users2[0].Name2 != ni {
+	if *users2[0].IName2 != ni {
 		t.Errorf("user Name2 not match")
 	}
 
-	if *users2[0].Name3 != f64n {
+	if *users2[0].FName3 != f64n {
 		t.Errorf("user Name3 not match")
 	}
 
-	if users2[0].Name4 != nil {
+	if users2[0].BName4 != nil {
 		t.Errorf("user Name4 not match")
 	}
 
@@ -387,11 +387,11 @@ func TestGetFieldsValuesOfItem(t *testing.T) {
 	}
 
 	type user2 struct {
-		Name  *string  `dbcn:"Name"`
-		Name2 *int     `dbcn:"Name2"`
-		Name3 *float64 `dbcn:"Name3"`
-		Name4 *[]byte  `dbcn:"Name4"`
-		Name5 []int
+		SName  *string  `dbcn:"Name"`
+		IName2 *int     `dbcn:"Name2"`
+		FName3 *float64 `dbcn:"Name3"`
+		BName4 *[]byte  `dbcn:"Name4"`
+		Name5  []int
 	}
 
 	const tagName, tagName2 = "db", "dbcn"
@@ -438,10 +438,10 @@ func TestGetFieldsValuesOfItem(t *testing.T) {
 	f64n = 67.67
 	bsn = []byte{0xF}
 
-	val2 := user2{Name: &nstr, Name2: &ni, Name3: &f64n, Name4: &bsn}
+	val2 := user2{SName: &nstr, IName2: &ni, FName3: &f64n, BName4: &bsn}
 
 	var userFiels2 []any
-	typeMap, err = Mapper.Map(reflect.TypeFor[user2](), tagName)
+	typeMap, err = Mapper.Map(reflect.TypeFor[user2](), tagName2)
 
 	if err != nil {
 		t.Errorf("error in mapper %s", err.Error())

@@ -67,7 +67,11 @@ func MapFunc(item reflect.Type, tagName string) (*TypeMap, error) {
 		columnName := field.Tag.Get(tagName)
 		ogType := field.Type
 		nonRefType := ConversionTypeToNonRefType(ogType)
-		if len(columnName) > 0 && field.IsExported() && IsScannable(nonRefType) && (ogType.Kind() != reflect.Pointer || (ogType.Kind() == reflect.Pointer && ogType.Elem() == nonRefType)) {
+		clName := len(columnName) > 0
+		exprtd := field.IsExported()
+		scannable := IsScannable(nonRefType)
+		pointerCheck := ogType.Kind() != reflect.Pointer || (ogType.Kind() == reflect.Pointer && ogType.Elem() == nonRefType)
+		if clName && exprtd && scannable && pointerCheck {
 			fieldInfo := &FieldInfo{}
 
 			fieldInfo.Ftype = ogType
@@ -127,7 +131,7 @@ func IsScannable(t reflect.Type) bool {
 }
 
 func (mapper *Mapper) Map(item reflect.Type, tagName string) (*TypeMap, error) {
-	nonRefType := ConversionValToNonRefType(item)
+	nonRefType := ConversionTypeToNonRefType(item)
 
 	var err error
 	mapper.cacheLock.RLock()
