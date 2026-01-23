@@ -274,15 +274,16 @@ func (db *DB) InsertContext(context context.Context, queryConfig sqlstrings.Quer
 		query = sqlstrings.GetInsertQuery(queryConfig)
 	}
 
-	if len(args) == 0 && queryConfig.ItemToAdd != nil && db.mapper != nil {
+	if len(args) == 0 && queryConfig.Item != nil && db.mapper != nil {
 		db.mapperMutex.RLock()
-		typeMap, err := db.mapper.Map(reflect.TypeOf(queryConfig.ItemToAdd), queryConfig.TagName)
+		typeMap, err := db.mapper.Map(reflect.TypeOf(queryConfig.Item), queryConfig.TagName)
 		db.mapperMutex.RUnlock()
 		if err != nil {
 			return -1, err
 		}
 
-		args = sqlreflect.GetFieldsValuesOfItem(queryConfig.ItemToAdd, typeMap, queryConfig.ExcludedTags)
+		queryConfig.QueryType = sqlstrings.INSERT
+		args = sqlreflect.GetFieldsValuesOfItem(queryConfig, typeMap)
 	}
 
 	return db.handler.InsertContext(context, query, queryConfig, args...)
@@ -308,15 +309,15 @@ func (db *DB) UpdateContext(context context.Context, queryConfig sqlstrings.Quer
 		query = sqlstrings.GetUpdateQuery(queryConfig)
 	}
 
-	if len(args) == 0 && queryConfig.ItemToAdd != nil && db.mapper != nil {
+	if len(args) == 0 && queryConfig.Item != nil && db.mapper != nil {
 		db.mapperMutex.RLock()
-		typeMap, err := db.mapper.Map(reflect.TypeOf(queryConfig.ItemToAdd), queryConfig.TagName)
+		typeMap, err := db.mapper.Map(reflect.TypeOf(queryConfig.Item), queryConfig.TagName)
 		db.mapperMutex.RUnlock()
 		if err != nil {
 			return -1, err
 		}
-
-		args = sqlreflect.GetFieldsValuesOfItem(queryConfig.ItemToAdd, typeMap, queryConfig.ExcludedTags)
+		queryConfig.QueryType = sqlstrings.UPDATE
+		args = sqlreflect.GetFieldsValuesOfItem(queryConfig, typeMap)
 	}
 
 	db.handlerMutex.RLock()

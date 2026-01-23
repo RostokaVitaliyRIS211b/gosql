@@ -46,14 +46,15 @@ type QueryConfig struct {
 	NameWrapper  string
 	ColumnName   string
 	TagName      string
-	ItemToAdd    any
+	Item         any
 	ExcludedTags []string
+	QueryType    QueryType
 }
 
 // Возвращает строку указанного типа /
 // Returns a string of the specified type
-func GetQuery(params QueryConfig, queryType QueryType) string {
-	switch queryType {
+func GetQuery(params QueryConfig) string {
+	switch params.QueryType {
 	case INSERT:
 		return GetInsertQuery(params)
 	case UPDATE:
@@ -80,11 +81,11 @@ func GetInsertQuery(params QueryConfig) string {
 		tagName = params.TagName
 	}
 
-	if params.ItemToAdd == nil {
+	if params.Item == nil {
 		return "ItemToAdd is nil fix that"
 	}
 
-	typeOfN := ConversionValToNonRefType(params.ItemToAdd)
+	typeOfN := ConversionValToNonRefType(params.Item)
 
 	numFields := typeOfN.NumField()
 
@@ -164,11 +165,11 @@ func GetInsertQuery(params QueryConfig) string {
 // Returns a string like UPDATE TableName SET ColumnName1=$1  ItemFieldTag2=$2 ... [WHERE ColumnName = $1] , if you pass ColumnName, then WHERE ColumnName = $1 will be added to the end of the string and the argument for it must be the first in the argument list. For the rest, the order of the arguments must match the order of the fields in the passed structure
 func GetUpdateQuery(params QueryConfig) string {
 
-	if params.ItemToAdd == nil {
+	if params.Item == nil {
 		return "ItemToAdd is nil fix that"
 	}
 
-	typeOfN := ConversionValToNonRefType(params.ItemToAdd)
+	typeOfN := ConversionValToNonRefType(params.Item)
 
 	counter := 0
 
@@ -245,12 +246,12 @@ func GetUpdateQuery(params QueryConfig) string {
 // Returns a string of type SELECT ItemFieldTag1, ItemFieldTag2 ... FROM TableName, if you pass columnName, WHERE columnName = $1 will be added to the end of the line, the argument for it must be the first in the argument list.
 func GetSelectQuery(params QueryConfig) string {
 
-	if params.ItemToAdd == nil {
+	if params.Item == nil {
 		return "ItemToAdd is nil fix that"
 	}
 
 	var builder strings.Builder
-	typeOfN := ConversionValToNonRefType(params.ItemToAdd)
+	typeOfN := ConversionValToNonRefType(params.Item)
 	numOfFields := typeOfN.NumField()
 
 	additionalSymbols := 11
@@ -322,7 +323,7 @@ func GetDeleteQuery(params QueryConfig) string {
 	tbName := params.TableName
 
 	if len(tbName) == 0 {
-		tbName = reflect.TypeOf(params.ItemToAdd).Name()
+		tbName = reflect.TypeOf(params.Item).Name()
 	}
 
 	columnName := params.ColumnName
@@ -361,7 +362,7 @@ func (q QueryConfig) ChangeTable(tableName string, item any) QueryConfig {
 		NameWrapper: q.NameWrapper,
 		ColumnName:  q.ColumnName,
 		TagName:     q.TagName,
-		ItemToAdd:   item,
+		Item:        item,
 	}
 	return *requiredProcessing(&query, &q)
 }
@@ -372,7 +373,7 @@ func (q QueryConfig) ChangeColumnName(columnName string) QueryConfig {
 		NameWrapper: q.NameWrapper,
 		ColumnName:  columnName,
 		TagName:     q.TagName,
-		ItemToAdd:   q.ItemToAdd,
+		Item:        q.Item,
 	}
 	return *requiredProcessing(&query, &q)
 }
@@ -383,7 +384,7 @@ func (q QueryConfig) ChangeExcludedTags(excludedTags ...string) QueryConfig {
 		NameWrapper: q.NameWrapper,
 		ColumnName:  q.ColumnName,
 		TagName:     q.TagName,
-		ItemToAdd:   q.ItemToAdd,
+		Item:        q.Item,
 	}
 	q.ExcludedTags = excludedTags
 	return *requiredProcessing(&query, &q)
@@ -395,7 +396,7 @@ func (q QueryConfig) ChangeItem(item any) QueryConfig {
 		NameWrapper: q.NameWrapper,
 		ColumnName:  q.ColumnName,
 		TagName:     q.TagName,
-		ItemToAdd:   item,
+		Item:        item,
 	}
 	return *requiredProcessing(&query, &q)
 }
@@ -406,7 +407,7 @@ func (q QueryConfig) ChangeTagName(tagName string) QueryConfig {
 		NameWrapper: q.NameWrapper,
 		ColumnName:  q.ColumnName,
 		TagName:     tagName,
-		ItemToAdd:   q.ItemToAdd,
+		Item:        q.Item,
 	}
 	return *requiredProcessing(&query, &q)
 }
@@ -417,7 +418,7 @@ func (q QueryConfig) ChangeNameWrapper(wrapper string) QueryConfig {
 		NameWrapper: wrapper,
 		ColumnName:  q.ColumnName,
 		TagName:     q.TagName,
-		ItemToAdd:   q.ItemToAdd,
+		Item:        q.Item,
 	}
 	return *requiredProcessing(&query, &q)
 }
@@ -452,9 +453,9 @@ type cacheKey struct {
 	ExcludedTags string // отсортированная строка тегов
 }
 
-func GetCachedQuery(params QueryConfig, queryType QueryType) string {
+func GetCachedQuery(params QueryConfig) string {
 
-	switch queryType {
+	switch params.QueryType {
 	case INSERT:
 		return GetInsertQueryCached(params)
 	case UPDATE:
@@ -469,7 +470,7 @@ func GetCachedQuery(params QueryConfig, queryType QueryType) string {
 }
 
 func GetInsertQueryCached(params QueryConfig) string {
-	itemType := ConversionValToNonRefType(params.ItemToAdd)
+	itemType := ConversionValToNonRefType(params.Item)
 
 	key := cacheKey{
 		Type:         itemType,
@@ -497,7 +498,7 @@ func GetInsertQueryCached(params QueryConfig) string {
 }
 
 func GetUpdateQueryCached(params QueryConfig) string {
-	itemType := ConversionValToNonRefType(params.ItemToAdd)
+	itemType := ConversionValToNonRefType(params.Item)
 
 	key := cacheKey{
 		Type:         itemType,
@@ -525,7 +526,7 @@ func GetUpdateQueryCached(params QueryConfig) string {
 }
 
 func GetSelectQueryCached(params QueryConfig) string {
-	itemType := ConversionValToNonRefType(params.ItemToAdd)
+	itemType := ConversionValToNonRefType(params.Item)
 
 	key := cacheKey{
 		Type:         itemType,

@@ -223,7 +223,7 @@ func GetFieldsPointersOfItem(item reflect.Value, tmap *TypeMap, excludedTags []s
 	return pointers
 }
 
-func GetFieldsValuesOfItem(item any, tmap *TypeMap, excludedTags []string) []any {
+func GetFieldsValuesOfItem(queryConfig sqlstrings.QueryConfig, tmap *TypeMap) []any {
 	var args []any
 
 	GetNonRefVal := func(val reflect.Value) reflect.Value {
@@ -235,14 +235,29 @@ func GetFieldsValuesOfItem(item any, tmap *TypeMap, excludedTags []string) []any
 		return val
 	}
 
-	if item == nil {
+	if queryConfig.Item == nil {
 		return args
 	}
 
-	val := GetNonRefVal(reflect.ValueOf(item))
+	val := GetNonRefVal(reflect.ValueOf(queryConfig.Item))
+
+	if len(queryConfig.ColumnName) > 0 && queryConfig.QueryType == sqlstrings.UPDATE {
+		idx := slices.IndexFunc(tmap.Fields, func(f *FieldInfo) bool { return f.FTag == queryConfig.ColumnName })
+		if idx >= 0 {
+			fieldInfo := tmap.Fields[idx]
+			field := val.FieldByName(fieldInfo.Name)
+			if field.Kind() == reflect.Pointer && !field.IsNil() {
+				args = append(args, field.Elem().Interface())
+			} else {
+				args = append(args, field.Interface())
+			}
+			queryConfig.ExcludedTags = append(queryConfig.ExcludedTags, queryConfig.ColumnName)
+		}
+
+	}
 
 	for _, fieldInfo := range tmap.Fields {
-		if !slices.Contains(excludedTags, fieldInfo.FTag) {
+		if !slices.Contains(queryConfig.ExcludedTags, fieldInfo.FTag) {
 			field := val.FieldByName(fieldInfo.Name)
 			if field.Kind() == reflect.Pointer && !field.IsNil() {
 				args = append(args, field.Elem().Interface())

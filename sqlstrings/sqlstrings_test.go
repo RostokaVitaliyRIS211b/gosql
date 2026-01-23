@@ -87,7 +87,7 @@ var config = QueryConfig{
 	TableName:    tableName,
 	NameWrapper:  wrapper,
 	ColumnName:   columnName,
-	ItemToAdd:    dbItem{},
+	Item:         dbItem{},
 	TagName:      "db",
 	ExcludedTags: []string{"Id"},
 }
@@ -98,7 +98,7 @@ func TestInsertQuery(t *testing.T) {
 		NameWrapper:  "",
 		ColumnName:   "",
 		TagName:      "",
-		ItemToAdd:    user2{},
+		Item:         user2{},
 		ExcludedTags: []string{"Id"},
 	}
 	res := GetInsertQuery(query)
@@ -138,7 +138,7 @@ func TestSelectQuery(t *testing.T) {
 		NameWrapper:  "",
 		ColumnName:   "",
 		TagName:      "",
-		ItemToAdd:    user2{},
+		Item:         user2{},
 		ExcludedTags: []string{"Id"},
 	}
 	res := GetSelectQuery(query)
@@ -178,7 +178,7 @@ func TestUpdateQuery(t *testing.T) {
 		NameWrapper:  "",
 		ColumnName:   "",
 		TagName:      "",
-		ItemToAdd:    user2{},
+		Item:         user2{},
 		ExcludedTags: []string{"Id"},
 	}
 	res := GetUpdateQuery(query)
@@ -218,7 +218,7 @@ func TestDeleteQuery(t *testing.T) {
 		NameWrapper:  "",
 		ColumnName:   "",
 		TagName:      "",
-		ItemToAdd:    user2{},
+		Item:         user2{},
 		ExcludedTags: []string{"Id"},
 	}
 	res := GetDeleteQuery(query)

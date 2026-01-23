@@ -309,7 +309,7 @@ func TestScan(t *testing.T) {
 		NameWrapper:  "",
 		ColumnName:   "",
 		TagName:      tagName,
-		ItemToAdd:    nil,
+		Item:         nil,
 		ExcludedTags: []string{},
 	}
 	nstr := "123"
@@ -411,7 +411,13 @@ func TestGetFieldsValuesOfItem(t *testing.T) {
 		t.Errorf("error in mapper %s", err.Error())
 	}
 
-	userFiels = GetFieldsValuesOfItem(val, typeMap, []string{})
+	qc := sqlstrings.QueryConfig{
+		Item:         val,
+		ExcludedTags: []string{},
+		QueryType:    sqlstrings.UPDATE,
+	}
+
+	userFiels = GetFieldsValuesOfItem(qc, typeMap)
 
 	if len(userFiels) != 4 {
 		t.Errorf("GetFieldsValuesOfItem failed")
@@ -443,28 +449,36 @@ func TestGetFieldsValuesOfItem(t *testing.T) {
 	var userFiels2 []any
 	typeMap, err = Mapper.Map(reflect.TypeFor[user2](), tagName2)
 
+	qc = sqlstrings.QueryConfig{
+		Item:         val2,
+		ColumnName:   "Name4",
+		ExcludedTags: []string{},
+		QueryType:    sqlstrings.UPDATE,
+	}
+
 	if err != nil {
 		t.Errorf("error in mapper %s", err.Error())
 	}
 
-	userFiels2 = GetFieldsValuesOfItem(val2, typeMap, []string{})
+	userFiels2 = GetFieldsValuesOfItem(qc, typeMap)
 	if len(userFiels2) != 4 {
 		t.Errorf("GetFieldsValuesOfItem2 failed")
 	}
 
-	if string(userFiels2[3].([]byte)) != string(bsn) {
+	if string(userFiels2[0].([]byte)) != string(bsn) {
 		t.Errorf("user Name4 not match")
 	}
 
-	if userFiels2[2].(float64) != f64n {
-		t.Errorf("user Name3 not match")
+	if userFiels2[1].(string) != nstr {
+		t.Errorf("user Name not match")
 	}
 
-	if userFiels2[1].(int) != ni {
+	if userFiels2[2].(int) != ni {
 		t.Errorf("user Name2 not match")
 	}
 
-	if userFiels2[0].(string) != nstr {
-		t.Errorf("user Name not match")
+	if userFiels2[3].(float64) != f64n {
+		t.Errorf("user Name3 not match")
 	}
+
 }
