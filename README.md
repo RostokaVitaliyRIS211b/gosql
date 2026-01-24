@@ -63,11 +63,14 @@ func main(){
 	    NameWrapper:  "\"",                 // Указываем строку в которую будут обёрнуты имя таблицы
 											// и названия столбцов. Пример имя таблицы Users -> "Users"
 	    ColumnName:   "Id",                 // Если нужно получить Id добавленной записи или
-											// любой другой столбец, то необходимо указать имя данного столбца
-	    TagName:      "db",                 // Указываем имя тега, значением которого является имя столбца таблицы
+											// любой другой столбец, то необходимо указать имя данного
+											// столбца
+	    TagName:      "db",                 // Указываем имя тега, значением которого является имя
+											// столбца таблицы
 	    Item:         nil,                  // Запись для добавления/обновления/получения/удаления
-	    ExcludedTags: []string{"Id"},       // Указываем имена столбцов которые нужно исключить из запроса,
-											// в данном случае нам не нужно при добавлении указывать Id
+	    ExcludedTags: []string{"Id"},       // Указываем имена столбцов которые нужно исключить
+											// из запроса, в данном случае нам не нужно при добавлении
+											// указывать Id
 	    QueryType:    sqlstrings.INSERT,    // Тип запроса INSERT
     }
 
@@ -80,11 +83,12 @@ func main(){
 
     // Обертка сама сгенерирует строку запроса, и возьмёт аргументы для добавления
 	// из переданной структуры, если включен маппинг
-    // Итоговая строка запроса будет выглядеть так: INSERT INTO "Users" ("Name","Password","Description")
-	// VALUES ($1,$2,$3) RETURNING "Id"
-    // Шаблон такой INSERT INTO [NameWrapper]TableName[NameWrapper] ([NameWrapper]FieldTag1[NameWrapper] ,
-    // [NameWrapper]FieldTag2[NameWrapper], ...[NameWrapper]FieldTagN[NameWrapper])
-	// VALUES ($1,$2, ... $n) [RETURNING [NameWrapper]ColumnName[NameWrapper]]
+    // Итоговая строка запроса будет выглядеть так: INSERT INTO "Users" 
+	// ("Name","Password","Description") VALUES ($1,$2,$3) RETURNING "Id"
+    // Шаблон такой INSERT INTO [NameWrapper]TableName[NameWrapper] 
+    // ([NameWrapper]FieldTag1[NameWrapper] , [NameWrapper]FieldTag2[NameWrapper], 
+	// ...[NameWrapper]FieldTagN[NameWrapper]) VALUES ($1,$2, ... $n)
+	// [RETURNING [NameWrapper]ColumnName[NameWrapper]]
     idx,_:=DB.Insert(currentConfig)
 
     user.Name = "Test2"
@@ -97,12 +101,15 @@ func main(){
 
     var selectQC = sqlstrings.QueryConfig{
 		TableName:    "",                   // Имя таблицы
-	    NameWrapper:  "\"",                 // Указываем строку в которую будут обёрнуты имя таблицы и названия столбцов.
-											// Пример имя таблицы Users -> "Users"
-	    ColumnName:   "",                   // ColumnName используется для фильтрации результатов при типе запроса SELECT
-	    TagName:      "db",                 // Указываем имя тега, значением которого является имя столбца таблицы
+	    NameWrapper:  "\"",                 // Указываем строку в которую будут обёрнуты имя таблицы
+											//  и названия столбцов. Пример имя таблицы Users -> "Users"
+	    ColumnName:   "",                   // ColumnName используется для фильтрации результатов при
+											// типе запроса SELECT
+	    TagName:      "db",                 // Указываем имя тега, значением которого является
+											// имя столбца таблицы
 	    Item:         nil,                  // Запись для добавления/обновления/получения/удаления
-	    ExcludedTags: []string{},           // Указываем имена столбцов которые нужно исключить из запроса
+	    ExcludedTags: []string{},           // Указываем имена столбцов которые нужно
+											// исключить из запроса
 	    QueryType:    sqlstrings.SELECT,    // Тип запроса SELECT
     }
 
@@ -116,8 +123,8 @@ func main(){
 
     DB.Select(currentSelect,&users)
 
-    // Шаблон строки запроса SELECT [NameWrapper]FieldTag1[NameWrapper] ,[NameWrapper]FieldTag2[NameWrapper],
-	// ...[NameWrapper]FieldTagN[NameWrapper] FROM [NameWrapper]
+    // Шаблон строки запроса SELECT [NameWrapper]FieldTag1[NameWrapper] ,
+	// [NameWrapper]FieldTag2[NameWrapper], ...[NameWrapper]FieldTagN[NameWrapper] FROM [NameWrapper]
     // TableName[NameWrapper] [WHERE [NameWrapper]ColumnName[NameWrapper] = $1]
 
     user1,user2:=users[0],users[1]
@@ -129,13 +136,15 @@ func main(){
 
     var whereIdQC = sqlstrings.QueryConfig{
 	    TableName:    "",                   // Имя таблицы
-	    NameWrapper:  "\"",                 // Указываем строку в которую будут обёрнуты имя таблицы и названия столбцов.
-											// Пример имя таблицы Users -> "Users"
+	    NameWrapper:  "\"",                 // Указываем строку в которую будут обёрнуты имя таблицы 
+											// и названия столбцов. Пример имя таблицы Users -> "Users"
 	    ColumnName:   "Id",                 // ColumnName используется для фильтрации результатов,
 											// в конец строки запроса будет добавлено WHERE Id = $1
-	    TagName:      "db",                 // Указываем имя тега, значением которого является имя столбца таблицы
+	    TagName:      "db",                 // Указываем имя тега, значением которого является
+											// имя столбца таблицы
 	    Item:         nil,                  // Запись для добавления/обновления/получения/удаления
-	    ExcludedTags: []string{},           // Указываем имена столбцов которые нужно исключить из запроса
+	    ExcludedTags: []string{},           // Указываем имена столбцов которые нужно исключить
+											// из запроса
 	    QueryType:    sqlstrings.SELECT,    // Тип запроса SELECT
     }
 
@@ -157,13 +166,16 @@ func main(){
 
     var updateQC = sqlstrings.QueryConfig{
 	    TableName:    "",                   // Имя таблицы
-	    NameWrapper:  "\"",                 // Указываем строку в которую будут обёрнуты имя таблицы и названия столбцов.
-											// Пример имя таблицы Users -> "Users"
-	    ColumnName:   "Id",                 // ColumnName используется для обновления определенной записи,
+	    NameWrapper:  "\"",                 // Указываем строку в которую будут обёрнуты имя таблицы 
+											// и названия столбцов. Пример имя таблицы Users -> "Users"
+	    ColumnName:   "Id",                 // ColumnName используется для обновления
+											// определенной записи,
 											// в конец строки запроса будет добавлено WHERE Id = $1
-	    TagName:      "db",                 // Указываем имя тега, значением которого является имя столбца таблицы
+	    TagName:      "db",                 // Указываем имя тега, значением которого является
+											// имя столбца таблицы
 	    Item:         nil,                  // Запись для добавления/обновления/получения/удаления
-	    ExcludedTags: []string{"Id"},       // Указываем имена столбцов которые нужно исключить из запроса,
+	    ExcludedTags: []string{"Id"},       // Указываем имена столбцов которые нужно исключить
+											// из запроса,
 											// в данном случае нам не нужно обновлять Id
 	    QueryType:    sqlstrings.UPDATE,    // Тип запроса UPDATE
     }
@@ -173,11 +185,12 @@ func main(){
     // Если указан ColumnName и включен маппинг тогда при передаче
 	// аргументов первым будет поле структуры с значением тега равным ColumnName
     // Текущий порядок передачи аргументов Id,Name,Password,Description
-    // Обертка сама сгенерирует строку запроса, а аргументы будут взяты из переданной структуры, если включен маппинг
+    // Обертка сама сгенерирует строку запроса, а аргументы будут взяты из переданной структуры,
+	//  если включен маппинг
     DB.Update(currentUpdate)
 
-    // Шаблон строки UPDATE [NameWrapper]TableName[NameWrapper] SET [NameWrapper]FieldTag1[NameWrapper] = $1[2],
-	// ... [NameWrapper]FieldTagN[NameWrapper] = $n
+    // Шаблон строки UPDATE [NameWrapper]TableName[NameWrapper] SET
+	//  [NameWrapper]FieldTag1[NameWrapper] = $1[2], ... [NameWrapper]FieldTagN[NameWrapper] = $n
     // [WHERE [NameWrapper]ColumnName[NameWrapper] = $1]
 
     DB.Get(currentGet,&user,idx)
@@ -188,13 +201,16 @@ func main(){
 
     var deleteQC = sqlstrings.QueryConfig{
 	    TableName:    "",                   // Имя таблицы
-	    NameWrapper:  "\"",                 // Указываем строку в которую будут обёрнуты имя таблицы и названия столбцов.
-											// Пример имя таблицы Users -> "Users"
-	    ColumnName:   "Id",                 // ColumnName используется для обновления определенной записи,
+	    NameWrapper:  "\"",                 // Указываем строку в которую будут обёрнуты имя таблицы 
+											// и названия столбцов. Пример имя таблицы Users -> "Users"
+	    ColumnName:   "Id",                 // ColumnName используется для обновления
+											// определенной записи,
 											// в конец строки запроса будет добавлено WHERE Id = $1
-	    TagName:      "db",                 // Указываем имя тега, значением которого является имя столбца таблицы
+	    TagName:      "db",                 // Указываем имя тега, значением которого является имя
+											// столбца таблицы
 	    Item:         nil,                  // Запись для добавления/обновления/получения/удаления
-	    ExcludedTags: []string{},           // Указываем имена столбцов которые нужно исключить из запроса
+	    ExcludedTags: []string{},           // Указываем имена столбцов которые нужно исключить
+											// из запроса
 	    QueryType:    sqlstrings.DELETE,    // Тип запроса DELETE
     }
 
@@ -210,7 +226,8 @@ func main(){
 
     //Различные методы обертки
 
-	// Можно отключить маппинг, тогда при запросах INSERT и UPDATE аргументы никогда не будут взяты из переданной структуры
+	// Можно отключить маппинг, тогда при запросах INSERT и UPDATE аргументы никогда не будут
+	// взяты из переданной структуры
     DB.SetMapper(nil)
 
 	// Можно отключить использование кэша при генерации строк запросов, если вам дорога память
@@ -286,7 +303,8 @@ func main(){
 										// and column names. Example table name Users -> "Users"
 	    ColumnName: "Id", 				// If you want to get the Id of the added record or
 										// any other column, you must specify the name of this column
-	    TagName: "db", 					// Specify the name of the tag, the value of which is the name of the table column
+	    TagName: "db", 					// Specify the name of the tag, the value of which is the name
+										//  of the table column
 	    Item: nil, 						// Entry to add/update/receive/delete
 	    ExcludedTags: []string{"Id"}, 	// Specifying the names of the columns to exclude from the query,
 										// in this case, we don't need to specify the Id when adding
@@ -302,11 +320,12 @@ func main(){
 
     // The wrapper will generate the query string itself, and will take arguments to add
 	// from the passed structure if mapping is enabled
-    // The final query string will look like this: INSERT INTO "Users" ("Name","Password","Description")
-	// VALUES ($1,$2,$3) RETURNING "Id"
-	// The template is INSERT INTO [NameWrapper]TableName[NameWrapper] ([NameWrapper]FieldTag1[NameWrapper] ,
-    // [NameWrapper]FieldTag2[NameWrapper], ...[NameWrapper]FieldTagN[NameWrapper])
-	// VALUES ($1,$2, ... $n) [RETURNING [NameWrapper]ColumnName[NameWrapper]]
+    // The final query string will look like this: INSERT INTO "Users" 
+	// ("Name","Password","Description") VALUES ($1,$2,$3) RETURNING "Id"
+	// The template is INSERT INTO [NameWrapper]TableName[NameWrapper] 
+    // ([NameWrapper]FieldTag1[NameWrapper] , [NameWrapper]FieldTag2[NameWrapper], 
+	// ...[NameWrapper]FieldTagN[NameWrapper]) VALUES ($1,$2, ... $n)
+	// [RETURNING [NameWrapper]ColumnName[NameWrapper]]
     idx,_:=DB.Insert(currentConfig)
 
     user.Name = "Test2"
@@ -319,10 +338,13 @@ func main(){
 
     var selectQC = sqlstrings.QueryConfig{
 		TableName: "", 					// Table name
-	    NameWrapper: "\"", 				// Specify the row in which the table name and column names will be wrapped.
+	    NameWrapper: "\"", 				// Specify the row in which the table name and column names
+										// will be wrapped.
 										// Example name of the Users table -> "Users"
-	    ColumnName: "", 				// ColumnName is used to filter results with the SELECT query type
-	    TagName: "db", 					// Specify the name of the tag, the value of which is the name of the table column
+	    ColumnName: "", 				// ColumnName is used to filter results with the
+										// SELECT query type
+	    TagName: "db", 					// Specify the name of the tag, the value of which is
+										// the name of the table column
 	    Item: nil, 						// Entry to add/update/receive/delete
 	    ExcludedTags: []string{}, 		// Specifying the names of the columns to exclude from the query
 	    QueryType: sqlstrings.SELECT,	// Query type SELECT
@@ -338,8 +360,8 @@ func main(){
 
     DB.Select(currentSelect,&users)
 
-    // Query string template SELECT [NameWrapper]FieldTag1[NameWrapper] ,[NameWrapper]FieldTag2[NameWrapper],
-	// ...[NameWrapper]FieldTagN[NameWrapper] FROM [NameWrapper]
+    // Query string template SELECT [NameWrapper]FieldTag1[NameWrapper] ,
+	// [NameWrapper]FieldTag2[NameWrapper], ...[NameWrapper]FieldTagN[NameWrapper] FROM [NameWrapper]
     // TableName[NameWrapper] [WHERE [NameWrapper]ColumnName[NameWrapper] = $1]
 
     user1,user2:=users[0],users[1]
@@ -351,11 +373,13 @@ func main(){
 
     var whereIdQC = sqlstrings.QueryConfig{
 	    TableName: "", 					// Table name
-	    NameWrapper: "\"", 				// Specify the row in which the table name and column names will be wrapped.
+	    NameWrapper: "\"", 				// Specify the row in which the table name and
+										// column names will be wrapped.
 										// Example name of the Users table -> "Users"
 	    ColumnName: "Id", 				// ColumnName is used to filter the results,
 										// WHERE Id = $1 will be added to the end of the query string
-	    TagName: "db", 					// Specify the name of the tag, the value of which is the name of the table column
+	    TagName: "db", 					// Specify the name of the tag, the value of which is
+										//  the name of the table column
 	    Item: nil, 						// Entry to add/update/receive/delete
 	    ExcludedTags: []string{}, 		// Specifying the names of the columns to exclude from the query
 	    QueryType: sqlstrings.SELECT,	// Query type SELECT
@@ -379,11 +403,13 @@ func main(){
 
     var updateQC = sqlstrings.QueryConfig{
 	    TableName: "", 					// Table name
-	    NameWrapper: "\"", 				// Specify the row in which the table name and column names will be wrapped.
+	    NameWrapper: "\"", 				// Specify the row in which the table name and
+										// column names will be wrapped.
 										// Example name of the Users table -> "Users"
 	    ColumnName: "Id", 				// ColumnName is used to update a specific record,
 										// WHERE Id = $1 will be added to the end of the query string
-	    TagName: "db", 					// Specify the name of the tag, the value of which is the name of the table column
+	    TagName: "db", 					// Specify the name of the tag, the value of which
+										// is the name of the table column
 	    Item: nil, 						// Entry to add/update/receive/delete
 	    ExcludedTags: []string{"Id"}, 	// Specifying the names of the columns to exclude from the query,
 										// in this case, we don't need to update the Id
@@ -399,8 +425,8 @@ func main(){
 	// and the arguments will be taken from the passed structure if mapping is enabled
     DB.Update(currentUpdate)
 
-    // String template UPDATE [NameWrapper]TableName[NameWrapper] SET [NameWrapper]FieldTag1[NameWrapper] = $1[2],
-	// ... [ NameWrapper]FieldTagN[NameWrapper] = $n
+    // String template UPDATE [NameWrapper]TableName[NameWrapper] SET 
+	// [NameWrapper]FieldTag1[NameWrapper] = $1[2],  ... [ NameWrapper]FieldTagN[NameWrapper] = $n
     // [WHERE [NameWrapper]ColumnName[NameWrapper] = $1]
 
     DB.Get(currentGet,&user,idx)
@@ -411,11 +437,13 @@ func main(){
 
     var deleteQC = sqlstrings.QueryConfig{
 	    TableName: "", 					// Table name
-	    NameWrapper: "\"", 				// Specify the row in which the table name and column names will be wrapped.
+	    NameWrapper: "\"", 				// Specify the row in which the table name and
+										// column names will be wrapped.
 										// Example name of the Users table -> "Users"
 	    ColumnName: "Id", 				// ColumnName is used to update a specific record,
 										// WHERE Id = $1 will be added to the end of the query string
-	    TagName: "db", 					// Specify the name of the tag, the value of which is the name of the table column
+	    TagName: "db", 					// Specify the name of the tag, the value of which is
+										// the name of the table column
 	    Item: nil, 						// Entry to add/update/receive/delete
 	    ExcludedTags: []string{}, 		// Specifying the names of the columns to exclude from the query
 	    QueryType: sqlstrings.DELETE,	// Query type DELETE
