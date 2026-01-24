@@ -253,8 +253,10 @@ func (db *DB) GetContext(context context.Context, queryConfig sqlstrings.QueryCo
 }
 
 // Если аргументы пусты, маппер присутствует  и queryConfig.ItemToAdd != nil, тогда аргументы будут взяты из queryConfig.ItemToAdd, если хотите отключить такое поведение вызовите SetMapper(nil)
+// Также при указании queryConfig.ColumnName будет произведен поиск поля структуры с значением тега равного queryConfig.ColumnName и значение этого поля будет использоваться в выражении WHERE = $1
 // ================================================================================================================================
 // If the arguments are empty, the mapper is present and queryConfig.ItemToAdd != nil, then the arguments will be taken from queryConfig.ItemToAdd, if you want to disable this behavior, call SetMapper(nil)
+// Also, when queryConfig.columnName is specified, a structure field with a tag value equal to queryConfig.columnName will be searched and the value of this field will be used in the expression WHERE = $1.
 func (db *DB) Insert(queryConfig sqlstrings.QueryConfig, args ...any) (int, error) {
 	return db.InsertContext(context.Background(), queryConfig, args...)
 }
@@ -356,6 +358,12 @@ func (db *DB) ExecContext(context context.Context, query string, args ...any) (i
 
 func (db *DB) UseCachedFuncs(b bool) {
 	db.useCachedFuncs.Store(b)
+}
+
+func (db *DB) ChangeHandler(handler DbHandler) {
+	db.handlerMutex.Lock()
+	defer db.handlerMutex.Unlock()
+	db.handler = handler
 }
 
 //endregion
